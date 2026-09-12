@@ -1,21 +1,73 @@
-# Next.js template
+# PUBG Insight
 
-This is a Next.js template with shadcn/ui.
+基于 Next.js 16、React 19、TypeScript、Tailwind CSS 4 和 shadcn/ui 的 PUBG 官方战绩查询与比赛分析应用。
 
-## Adding components
+## 功能
 
-To add components to your app, run the following command:
+- 按 Steam、Kakao、PlayStation、Xbox 平台查询玩家。
+- 查看当前或指定赛季、指定模式的击杀、胜场、伤害、KDA 和趋势图。
+- 查看最近比赛的地图、模式、排名、击杀和遥测可用性。
+- 延迟加载比赛参赛者、击杀时间线和降采样移动轨迹。
+- 使用 Cloudflare D1 保存规范化快照和缓存，不保存无限期原始遥测。
+
+## 本地开发
 
 ```bash
-npx shadcn@latest add button
+pnpm install
+pnpm db:migrate:local
+pnpm dev:vinext
 ```
 
-This will place the ui components in the `components` directory.
+Worker preview（包含生产构建产物）使用：
 
-## Using components
-
-To use the components in your app, import them as follows:
-
-```tsx
-import { Button } from "@/components/ui/button";
+```bash
+pnpm preview:worker
 ```
+
+本地 API Key 可以写入 `.dev.vars`：
+
+```text
+PUBG_API_KEY=your-pubg-api-key
+```
+
+`.dev.vars` 不应提交到 Git。Worker 部署环境使用 Secret，不通过客户端环境变量暴露。
+
+## Cloudflare D1 与部署
+
+当前 `wrangler.jsonc` 已声明 `DB` 绑定、`pubg-stats` 数据库名以及 local/preview/production 环境。首次部署前，在已登录 Cloudflare 的终端执行：
+
+```bash
+pnpm wrangler login
+pnpm wrangler d1 create pubg-stats --location apac
+pnpm wrangler secret put PUBG_API_KEY
+pnpm wrangler types cloudflare-env.d.ts --env-interface CloudflareBindings --include-runtime=false
+pnpm db:migrate:remote
+pnpm deploy:vinext
+```
+
+将 `wrangler d1 create` 输出的真实 `database_id` 填入 production（如使用 preview，也填入 preview）配置后再执行远程迁移和部署。远程迁移不会被部署脚本自动执行。
+
+## API 路由
+
+| 路由 | 用途 |
+| --- | --- |
+| `GET /api/health` | Worker、D1 和 Secret 配置状态 |
+| `GET /api/seasons?platform=steam` | 赛季列表 |
+| `GET /api/players?platform=steam&name=playerName` | 玩家与最近比赛 |
+| `GET /api/players/:playerId/stats?platform=steam&season=current&gameMode=squad` | 赛季模式统计 |
+| `GET /api/matches/:matchId?platform=steam` | 比赛详情与参赛者 |
+| `GET /api/matches/:matchId/telemetry?platform=steam&playerId=...` | 遥测解析、事件和轨迹 |
+
+## 验证
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+pnpm build:worker
+pnpm db:migrate:local
+pnpm db:status
+```
+
+PUBG API 的真实 smoke test 需要先配置 `PUBG_API_KEY`；未配置时接口会返回明确的 `missing_api_key` 错误，不会把 Secret 放入 HTML 或客户端代码。

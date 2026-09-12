@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "type": "season", "id": "division.bro.official.2026-09", "attributes": { "isCurrentSeason": true, "name": "2026 第 9 赛季" } },
+    { "type": "season", "id": "division.bro.official.2026-08", "attributes": { "isCurrentSeason": false, "name": "2026 第 8 赛季" } }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "data": {
+    "type": "player",
+    "id": "account.123",
+    "attributes": { "name": "TestPlayer" },
+    "relationships": {
+      "matches": {
+        "data": [{ "type": "match", "id": "match-001" }, { "type": "match", "id": "match-002" }]
+      }
+    }
+  }
+}

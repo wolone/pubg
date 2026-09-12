@@ -1,0 +1,5 @@
+[
+  { "_T": "LogPlayerPosition", "_D": "2026-09-12T10:01:00Z", "character": { "accountId": "account.123", "location": { "x": 100, "y": 200, "z": 10 } } },
+  { "_T": "LogPlayerKill", "_D": "2026-09-12T10:04:00Z", "killer": { "accountId": "account.123", "location": { "x": 120, "y": 240 } }, "victim": { "accountId": "account.456", "location": { "x": 125, "y": 245 } } },
+  { "_T": "LogPlayerPosition", "_D": "2026-09-12T10:05:00Z", "character": { "accountId": "account.123", "location": { "x": 180, "y": 300, "z": 8 } } }
+]

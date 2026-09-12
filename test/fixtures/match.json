@@ -1,0 +1,21 @@
+{
+  "data": {
+    "type": "match",
+    "id": "match-001",
+    "attributes": {
+      "createdAt": "2026-09-12T10:00:00Z",
+      "duration": 1540,
+      "gameMode": "squad-fpp",
+      "mapName": "Baltic_Main",
+      "titleId": "pubg"
+    },
+    "relationships": {
+      "assets": { "data": [{ "type": "asset", "id": "asset-001" }] }
+    }
+  },
+  "included": [
+    { "type": "asset", "id": "asset-001", "attributes": { "URL": "https://telemetry.example/match-001" } },
+    { "type": "participant", "id": "participant-1", "attributes": { "stats": { "playerId": "account.123", "name": "TestPlayer", "winPlace": 3, "kills": 4, "damageDealt": 412.5, "timeSurvived": 1200 } } },
+    { "type": "participant", "id": "participant-2", "attributes": { "stats": { "playerId": "account.456", "name": "Opponent", "winPlace": 7, "kills": 1, "damageDealt": 120, "timeSurvived": 900 } } }
+  ]
+}

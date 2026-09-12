@@ -1,0 +1,21 @@
+{
+  "data": {
+    "type": "playerSeason",
+    "id": "account.123",
+    "attributes": {
+      "gameModeStats": {
+        "squad": {
+          "assists": 12,
+          "damageDealt": 1840.5,
+          "headshotKills": 4,
+          "kills": 18,
+          "longestKill": 222.4,
+          "losses": 8,
+          "roundsPlayed": 10,
+          "timeSurvived": 13100,
+          "wins": 2
+        }
+      }
+    }
+  }
+}
