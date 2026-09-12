@@ -11,6 +11,7 @@ import type {
 
 const CACHE_TTL_MS = 15 * 60 * 1000
 const MATCH_TTL_MS = 14 * 24 * 60 * 60 * 1000
+const REPLAY_PARSER_VERSION = 2
 
 type StatsRow = {
   platform: Platform
@@ -52,6 +53,7 @@ type AnalysisRow = {
   replay_players_json?: string
   replay_frames_json?: string
   replay_duration_seconds?: number
+  parser_version?: number
   generated_at: string
   expires_at: string
 }
@@ -295,9 +297,16 @@ export class StatsRepository {
     const row = await this.db
       .prepare(
         `SELECT * FROM player_match_analysis
-         WHERE platform = ? AND player_id = ? AND match_id = ? AND expires_at > ?`
+         WHERE platform = ? AND player_id = ? AND match_id = ?
+           AND parser_version = ? AND expires_at > ?`
       )
-      .bind(platform, playerId, matchId, new Date().toISOString())
+      .bind(
+        platform,
+        playerId,
+        matchId,
+        REPLAY_PARSER_VERSION,
+        new Date().toISOString()
+      )
       .first<AnalysisRow>()
     if (!row) {
       await this.db
@@ -341,13 +350,15 @@ export class StatsRepository {
       .prepare(
         `INSERT INTO player_match_analysis
          (platform, player_id, match_id, kills_json, trajectory_json, timeline_json,
-          replay_players_json, replay_frames_json, replay_duration_seconds, generated_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          replay_players_json, replay_frames_json, replay_duration_seconds, parser_version,
+          generated_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(platform, player_id, match_id) DO UPDATE SET
            kills_json = excluded.kills_json, trajectory_json = excluded.trajectory_json,
            timeline_json = excluded.timeline_json, replay_players_json = excluded.replay_players_json,
            replay_frames_json = excluded.replay_frames_json,
            replay_duration_seconds = excluded.replay_duration_seconds,
+           parser_version = excluded.parser_version,
            generated_at = excluded.generated_at, expires_at = excluded.expires_at`
       )
       .bind(
@@ -360,6 +371,7 @@ export class StatsRepository {
         JSON.stringify(analysis.replayPlayers),
         JSON.stringify(analysis.replayFrames),
         analysis.replayDurationSeconds,
+        REPLAY_PARSER_VERSION,
         generatedAt.toISOString(),
         expiresAt
       )
