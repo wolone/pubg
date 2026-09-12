@@ -58,6 +58,7 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
   const [analysis, setAnalysis] = React.useState<MatchAnalysis | null>(null)
   const [error, setError] = React.useState<ApiError["error"] | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [retryToken, setRetryToken] = React.useState(0)
 
   React.useEffect(() => {
     if (!playerId) {
@@ -65,7 +66,10 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
     }
     let cancelled = false
     async function load() {
+      setMatch(null)
+      setAnalysis(null)
       setError(null)
+      setLoading(true)
       try {
         const matchResponse = await fetch(
           `/api/matches/${encodeURIComponent(matchId)}?platform=${platform}&playerId=${encodeURIComponent(playerId)}`,
@@ -78,6 +82,8 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
             ? matchPayload.error
             : { code: "match_not_found", message: "比赛不存在。" }
         }
+        if (cancelled) return
+        setMatch(matchPayload)
         const telemetryResponse = await fetch(
           `/api/matches/${encodeURIComponent(matchId)}/telemetry?platform=${platform}&playerId=${encodeURIComponent(playerId)}`,
           { cache: "no-store" }
@@ -90,7 +96,6 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
             : { code: "telemetry_unavailable", message: "遥测不可用。" }
         }
         if (!cancelled) {
-          setMatch(matchPayload)
           setAnalysis(telemetryPayload)
         }
       } catch (cause) {
@@ -109,7 +114,7 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
     return () => {
       cancelled = true
     }
-  }, [matchId, platform, playerId])
+  }, [matchId, platform, playerId, retryToken])
 
   return (
     <div className="min-h-svh bg-muted/20">
@@ -136,11 +141,25 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
         {error ? (
           <Alert variant="destructive">
             <CrosshairIcon />
-            <AlertTitle>比赛回放不可用</AlertTitle>
-            <AlertDescription>{error.message}</AlertDescription>
+            <AlertTitle>
+              {match ? "回放遥测加载失败" : "比赛回放不可用"}
+            </AlertTitle>
+            <AlertDescription className="flex flex-wrap items-center gap-3">
+              <span>{error.message}</span>
+              {match ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => setRetryToken((value) => value + 1)}
+                >
+                  重试回放
+                </Button>
+              ) : null}
+            </AlertDescription>
           </Alert>
         ) : null}
-        {match && analysis ? (
+        {match ? (
           <>
             <div className="grid gap-4 sm:grid-cols-3">
               <Card>
@@ -162,10 +181,18 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="text-2xl font-semibold">
-                  {analysis.kills.length}{" "}
-                  <span className="text-sm font-normal text-muted-foreground">
-                    / {analysis.timeline.length}
-                  </span>
+                  {analysis ? (
+                    <>
+                      {analysis.kills.length}{" "}
+                      <span className="text-sm font-normal text-muted-foreground">
+                        / {analysis.timeline.length}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-base font-normal text-muted-foreground">
+                      暂无遥测
+                    </span>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -186,7 +213,9 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
                 </CardContent>
               </Card>
             </div>
-            <MatchReplay key={match.id} match={match} analysis={analysis} />
+            {analysis ? (
+              <MatchReplay key={match.id} match={match} analysis={analysis} />
+            ) : null}
             <Card>
               <CardHeader>
                 <CardTitle>参赛者成绩</CardTitle>
@@ -235,7 +264,7 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
             </Card>
           </>
         ) : null}
-        {!loading && !error && !playerId ? (
+        {!error && !playerId ? (
           <Alert>
             <AlertTitle>缺少目标玩家</AlertTitle>
             <AlertDescription>

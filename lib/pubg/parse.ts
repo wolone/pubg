@@ -4,6 +4,7 @@ import type {
   MatchSummary,
   Platform,
   ReplayFrame,
+  ReplayFramePlayer,
   ReplayPlayer,
   ReplayPlayerStatus,
   ReplayZones,
@@ -265,9 +266,11 @@ export function parseTelemetry(
       telemetryCharacter(event, "killer")
     const victim = telemetryCharacter(event, "victim")
     const character = telemetryCharacter(event, "character")
+    const itemPackage = telemetryCharacter(event, "itemPackage")
     const location =
       locationOf(character?.location) ??
       locationOf(attacker?.location) ??
+      locationOf(itemPackage?.location) ??
       locationOf(event.location)
     const elapsedSeconds = elapsedTimeOf(event, replayStartMs, eventIndex)
     const characterName = stringValue(character?.name, "")
@@ -285,7 +288,14 @@ export function parseTelemetry(
       stringValue(victim?.accountId, "") ||
       participantIdsByName.get(victimName) ||
       null
-    const replayZones = parseReplayZones(event)
+    const health = optionalPercentageNumber(
+      character?.health ?? attacker?.health
+    )
+    const victimHealth = optionalPercentageNumber(victim?.health)
+    const damage = optionalNonNegativeNumber(event.damage)
+    const damageType = stringValue(event.damageTypeCategory, "") || undefined
+    const replaySnapshot = parseReplaySnapshot(event)
+    const phase = optionalNonNegativeNumber(event.phase)
 
     if (characterId) {
       registerReplayPlayer(
@@ -301,8 +311,12 @@ export function parseTelemetry(
       registerReplayPlayer(replayPlayersById, target, victimName || target)
     }
 
-    if (replayZones) {
-      replayChanges.push({ elapsedSeconds, zones: replayZones })
+    if (replaySnapshot || phase !== undefined) {
+      replayChanges.push({
+        elapsedSeconds,
+        ...replaySnapshot,
+        phase,
+      })
     }
 
     if (location && (characterId || actor)) {
@@ -312,6 +326,7 @@ export function parseTelemetry(
           elapsedSeconds,
           playerId: replayPlayerId,
           location,
+          health,
         })
         positionCounts.set(
           replayPlayerId,
@@ -326,6 +341,7 @@ export function parseTelemetry(
         elapsedSeconds,
         playerId: target,
         location: victimLocation,
+        health: victimHealth,
       })
       positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
     }
@@ -337,6 +353,7 @@ export function parseTelemetry(
           playerId: target,
           status: "dead",
           location: victimLocation,
+          health: 0,
         })
         if (victimLocation) {
           positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
@@ -384,6 +401,7 @@ export function parseTelemetry(
       type.includes("Damage") ||
       type.includes("Death") ||
       /groggy|knock|revive|rescue/i.test(type) ||
+      type.includes("CarePackage") ||
       type === "LogPlayerPosition" ||
       type === "LogPlayerLogin" ||
       type === "LogPlayerCreate"
@@ -396,7 +414,15 @@ export function parseTelemetry(
       actor,
       target,
       location,
-      message: timelineMessage(type, actor, target),
+      ...(victimLocation ? { targetLocation: victimLocation } : {}),
+      ...(damage !== undefined ? { damage } : {}),
+      ...(damageType ? { damageType } : {}),
+      message: timelineMessage(
+        type,
+        actor ? (replayPlayersById.get(actor)?.name ?? actor) : null,
+        target ? (replayPlayersById.get(target)?.name ?? target) : null,
+        damage
+      ),
     })
   }
 
@@ -420,9 +446,10 @@ export function parseTelemetry(
     matchId,
     playerId,
     kills,
-    timeline: timeline
-      .filter((event) => event.type !== "LogPlayerPosition")
-      .slice(-120),
+    timeline: compactTimeline(
+      timeline.filter((event) => event.type !== "LogPlayerPosition"),
+      120
+    ),
     trajectory: downsample(trajectory, 240),
     replayPlayers,
     replayFrames: replay.frames,
@@ -435,13 +462,18 @@ type ReplayChange = {
   playerId?: string
   location?: { x: number; y: number; z?: number } | null
   status?: ReplayPlayerStatus
+  health?: number
   zones?: ReplayZones
+  alivePlayers?: number
+  aliveTeams?: number
+  phase?: number
 }
 
 type ReplayState = {
   x: number
   y: number
   status: ReplayPlayerStatus
+  health?: number
 }
 
 function timestampOf(event: Record<string, unknown>): number | null {
@@ -455,6 +487,20 @@ function elapsedTimeOf(
   startMs: number | null,
   fallbackIndex: number
 ) {
+  const explicitElapsed = numberValue(event.elapsedTime, Number.NaN)
+  if (Number.isFinite(explicitElapsed) && explicitElapsed >= 0) {
+    return explicitElapsed
+  }
+  const gameState = event.gameState
+  if (gameState && typeof gameState === "object") {
+    const gameStateElapsed = numberValue(
+      (gameState as Record<string, unknown>).elapsedTime,
+      Number.NaN
+    )
+    if (Number.isFinite(gameStateElapsed) && gameStateElapsed >= 0) {
+      return gameStateElapsed
+    }
+  }
   const timestamp = timestampOf(event)
   if (timestamp === null || startMs === null) return fallbackIndex / 10
   return Math.max(0, (timestamp - startMs) / 1000)
@@ -466,6 +512,31 @@ function registerReplayPlayer(
   name: string
 ) {
   if (!players.has(id)) players.set(id, { id, name })
+}
+
+function optionalNonNegativeNumber(value: unknown) {
+  const number = numberValue(value, Number.NaN)
+  return Number.isFinite(number) && number >= 0 ? number : undefined
+}
+
+function optionalPercentageNumber(value: unknown) {
+  const number = numberValue(value, Number.NaN)
+  return Number.isFinite(number) && number >= 0 && number <= 100
+    ? number
+    : undefined
+}
+
+function parseReplaySnapshot(event: Record<string, unknown>) {
+  const value = event.gameState
+  if (!value || typeof value !== "object") return null
+  const gameState = value as Record<string, unknown>
+  const zones = parseReplayZones(event)
+  const alivePlayers = optionalNonNegativeNumber(gameState.numAlivePlayers)
+  const aliveTeams = optionalNonNegativeNumber(gameState.numAliveTeams)
+  if (!zones && alivePlayers === undefined && aliveTeams === undefined) {
+    return null
+  }
+  return { zones: zones ?? undefined, alivePlayers, aliveTeams }
 }
 
 function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
@@ -484,8 +555,12 @@ function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
     gameState.redZonePosition,
     gameState.redZoneRadius
   )
-  if (!bluezone && !safezone && !redzone) return null
-  return { bluezone, safezone, redzone }
+  const blackzone = replayZoneOf(
+    gameState.blackZonePosition,
+    gameState.blackZoneRadius
+  )
+  if (!bluezone && !safezone && !redzone && !blackzone) return null
+  return { bluezone, safezone, redzone, blackzone }
 }
 
 function replayZoneOf(position: unknown, radius: unknown) {
@@ -509,6 +584,9 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   const states = new Map<string, ReplayState>()
   const frames: ReplayFrame[] = []
   let zones: ReplayZones | undefined
+  let alivePlayers: number | undefined
+  let aliveTeams: number | undefined
+  let phase: number | undefined
   let changeIndex = 0
 
   for (
@@ -522,6 +600,9 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     ) {
       const change = sortedChanges[changeIndex]!
       if (change.zones) zones = change.zones
+      if (change.alivePlayers !== undefined) alivePlayers = change.alivePlayers
+      if (change.aliveTeams !== undefined) aliveTeams = change.aliveTeams
+      if (change.phase !== undefined) phase = change.phase
       if (change.playerId) {
         const previous = states.get(change.playerId)
         if (change.location) {
@@ -529,9 +610,17 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
             x: change.location.x,
             y: change.location.y,
             status: change.status ?? previous?.status ?? "alive",
+            health: change.health ?? previous?.health,
           })
-        } else if (previous && change.status) {
-          states.set(change.playerId, { ...previous, status: change.status })
+        } else if (
+          previous &&
+          (change.status !== undefined || change.health !== undefined)
+        ) {
+          states.set(change.playerId, {
+            ...previous,
+            ...(change.status ? { status: change.status } : {}),
+            ...(change.health !== undefined ? { health: change.health } : {}),
+          })
         }
       }
       changeIndex += 1
@@ -540,19 +629,34 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     const framePlayers = Array.from(states.entries())
       .map(([id, state]) => {
         const playerIndex = playerIndexById.get(id)
-        return playerIndex === undefined
-          ? null
-          : ([playerIndex, state.x, state.y, state.status] as const)
+        if (playerIndex === undefined) return null
+        const player: ReplayFramePlayer = [
+          playerIndex,
+          state.x,
+          state.y,
+          state.status,
+        ]
+        if (state.health !== undefined) player[4] = state.health
+        return player
       })
       .filter((player): player is ReplayFrame["players"][number] =>
         Boolean(player)
       )
-    if (framePlayers.length || zones) {
+    if (
+      framePlayers.length ||
+      zones ||
+      alivePlayers !== undefined ||
+      aliveTeams !== undefined ||
+      phase !== undefined
+    ) {
       const frame: ReplayFrame = {
         elapsedSeconds: Math.round(elapsedSeconds * 10) / 10,
         players: framePlayers,
       }
       if (zones) frame.zones = zones
+      if (alivePlayers !== undefined) frame.alivePlayers = alivePlayers
+      if (aliveTeams !== undefined) frame.aliveTeams = aliveTeams
+      if (phase !== undefined) frame.phase = phase
       frames.push(frame)
     }
   }
@@ -563,20 +667,51 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
 function timelineMessage(
   type: string,
   actor: string | null,
-  target: string | null
+  target: string | null,
+  damage?: number
 ) {
   if (type.includes("Kill"))
     return `${actor ?? "玩家"} 淘汰了 ${target ?? "对手"}`
-  if (type.includes("Damage")) return `${actor ?? "玩家"} 造成了一次伤害`
+  if (type.includes("Damage")) {
+    return damage === undefined
+      ? `${actor ?? "玩家"} 造成了一次伤害`
+      : `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${damage} 点伤害`
+  }
   if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
   if (/revive|rescue/i.test(type)) return `${target ?? actor ?? "玩家"} 被救起`
   if (type.includes("Death")) return `${target ?? actor ?? "玩家"} 被淘汰`
+  if (type.includes("CarePackage")) {
+    return type.includes("Land") ? "补给箱已落地" : "补给箱已生成"
+  }
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
   return type
 }
 
+function compactTimeline(events: TelemetryEvent[], max: number) {
+  if (events.length <= max) return events
+
+  const important = events.filter((event) =>
+    /Kill|Death|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
+  )
+  const secondary = events.filter(
+    (event) =>
+      !/Kill|Death|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
+  )
+  const selected = [
+    ...important.slice(0, max),
+    ...downsample(secondary, Math.max(0, max - important.length)),
+  ]
+
+  return selected.sort((left, right) => {
+    if (left.elapsedSeconds === undefined) return 1
+    if (right.elapsedSeconds === undefined) return -1
+    return left.elapsedSeconds - right.elapsedSeconds
+  })
+}
+
 function downsample<T>(items: T[], max: number): T[] {
+  if (max <= 0) return []
   if (items.length <= max) return items
   const step = (items.length - 1) / (max - 1)
   return Array.from(

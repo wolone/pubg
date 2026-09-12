@@ -91,6 +91,10 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.trajectory).toHaveLength(2)
     expect(analysis.timeline).toHaveLength(1)
     expect(analysis.timeline[0]?.elapsedSeconds).toBe(180)
+    expect(analysis.timeline[0]?.targetLocation).toMatchObject({
+      x: 125,
+      y: 245,
+    })
     expect(analysis.replayPlayers).toEqual([
       { id: "account.123", name: "TestPlayer" },
       { id: "account.456", name: "Opponent" },
@@ -108,6 +112,7 @@ describe("PUBG JSON:API parser", () => {
       bluezone: { x: 400, y: 500, radius: 300 },
       safezone: { x: 410, y: 510, radius: 120 },
       redzone: { x: 600, y: 700, radius: 80 },
+      blackzone: null,
     })
   })
 
@@ -156,6 +161,7 @@ describe("PUBG JSON:API parser", () => {
       { id: "account.123", name: "TestPlayer" },
       { id: "account.456", name: "Opponent" },
     ])
+    expect(analysis.timeline[0]?.message).toBe("TestPlayer 淘汰了 Opponent")
   })
 
   it("keeps knock and revive events in the replay timeline", () => {
@@ -200,6 +206,225 @@ describe("PUBG JSON:API parser", () => {
       120,
       220,
       "alive",
+    ])
+  })
+
+  it("uses official elapsed time fields for replay synchronization", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          _D: "2026-09-12T10:00:00Z",
+          elapsedTime: 12,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogGameStatePeriodic",
+          _D: "2026-09-12T10:05:00Z",
+          gameState: {
+            elapsedTime: 45,
+            safetyZonePosition: { x: 400, y: 500 },
+            safetyZoneRadius: 300,
+          },
+        },
+        {
+          _T: "LogPlayerKill",
+          _D: "2026-09-12T10:10:00Z",
+          elapsedTime: 60,
+          killer: { accountId: "account.123", location: { x: 120, y: 240 } },
+          victim: { accountId: "account.456", location: { x: 125, y: 245 } },
+        },
+      ],
+      "account.123",
+      "match-elapsed-time"
+    )
+
+    expect(analysis.timeline[0]?.elapsedSeconds).toBe(60)
+    expect(
+      analysis.replayFrames.find((frame) => frame.zones)?.elapsedSeconds
+    ).toBe(45)
+    expect(analysis.replayFrames.at(-1)?.elapsedSeconds).toBe(60)
+  })
+
+  it("carries official alive counts and phase changes into replay frames", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogGameStatePeriodic",
+          gameState: {
+            elapsedTime: 30,
+            numAlivePlayers: 47,
+            numAliveTeams: 18,
+            blackZonePosition: { x: 50, y: 60 },
+            blackZoneRadius: 25,
+          },
+        },
+        {
+          _T: "LogPhaseChange",
+          elapsedTime: 45,
+          phase: 2,
+        },
+      ],
+      "account.123",
+      "match-replay-stats"
+    )
+
+    expect(analysis.replayFrames).toContainEqual(
+      expect.objectContaining({
+        elapsedSeconds: 30,
+        alivePlayers: 47,
+        aliveTeams: 18,
+        zones: expect.objectContaining({
+          blackzone: { x: 50, y: 60, radius: 25 },
+        }),
+      })
+    )
+    expect(analysis.replayFrames.at(-1)).toMatchObject({
+      elapsedSeconds: 45,
+      phase: 2,
+    })
+  })
+
+  it("adds care package events to the replay timeline with map locations", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogCarePackageSpawn",
+          _D: "2026-09-12T10:01:00Z",
+          itemPackage: {
+            itemPackageId: "package-1",
+            location: { x: 300, y: 400, z: 20 },
+          },
+        },
+        {
+          _T: "LogCarePackageLand",
+          _D: "2026-09-12T10:02:00Z",
+          itemPackage: {
+            itemPackageId: "package-1",
+            location: { x: 320, y: 420, z: 20 },
+          },
+        },
+      ],
+      "account.123",
+      "match-care-package"
+    )
+
+    expect(analysis.timeline.map((event) => event.type)).toEqual([
+      "LogCarePackageSpawn",
+      "LogCarePackageLand",
+    ])
+    expect(analysis.timeline[0]?.location).toMatchObject({ x: 300, y: 400 })
+    expect(analysis.timeline[1]?.message).toBe("补给箱已落地")
+  })
+
+  it("keeps damage amount and category for combat analysis", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          _D: "2026-09-12T10:01:00Z",
+          damage: 34.5,
+          damageTypeCategory: "Damage_Gun",
+          attacker: {
+            accountId: "account.123",
+            location: { x: 100, y: 200 },
+          },
+          victim: {
+            accountId: "account.456",
+            location: { x: 120, y: 220 },
+          },
+        },
+      ],
+      "account.123",
+      "match-damage"
+    )
+
+    expect(analysis.timeline[0]).toMatchObject({
+      damage: 34.5,
+      damageType: "Damage_Gun",
+      targetLocation: { x: 120, y: 220 },
+    })
+    expect(analysis.timeline[0]?.message).toContain("34.5 点伤害")
+  })
+
+  it("preserves key events when the timeline needs compacting", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerKill",
+          elapsedTime: 1,
+          killer: { accountId: "account.123" },
+          victim: { accountId: "account.456" },
+        },
+        ...Array.from({ length: 130 }, (_, index) => ({
+          _T: "LogPlayerTakeDamage",
+          elapsedTime: index + 2,
+          damage: 1,
+          attacker: { accountId: "account.123" },
+          victim: { accountId: "account.456" },
+        })),
+        {
+          _T: "LogPlayerDeath",
+          elapsedTime: 200,
+          character: { accountId: "account.456" },
+        },
+      ],
+      "account.123",
+      "match-compact-timeline"
+    )
+
+    expect(analysis.timeline).toHaveLength(120)
+    expect(
+      analysis.timeline.some((event) => event.type === "LogPlayerKill")
+    ).toBe(true)
+    expect(
+      analysis.timeline.some((event) => event.type === "LogPlayerDeath")
+    ).toBe(true)
+  })
+
+  it("carries player health through replay frames", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            health: 100,
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 5,
+          character: {
+            accountId: "account.123",
+            health: 72.5,
+            location: { x: 120, y: 220 },
+          },
+        },
+      ],
+      "account.123",
+      "match-health"
+    )
+
+    expect(analysis.replayFrames.at(-1)?.players[0]).toEqual([
+      0,
+      120,
+      220,
+      "alive",
+      72.5,
     ])
   })
 })

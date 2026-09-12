@@ -166,6 +166,11 @@ function interpolateZones(
       progress
     ),
     redzone: interpolateZone(leftZones.redzone, rightZones.redzone, progress),
+    blackzone: interpolateZone(
+      leftZones.blackzone,
+      rightZones.blackzone,
+      progress
+    ),
   }
 }
 
@@ -205,14 +210,27 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
         ? (leftPlayer?.[3] ?? rightPlayer?.[3] ?? "alive")
         : (rightPlayer?.[3] ?? leftPlayer?.[3] ?? "alive"),
     ]
+    if (leftPlayer?.[4] !== undefined || rightPlayer?.[4] !== undefined) {
+      nextPlayer[4] =
+        leftPlayer?.[4] !== undefined && rightPlayer?.[4] !== undefined
+          ? leftPlayer[4] + (rightPlayer[4] - leftPlayer[4]) * progress
+          : (leftPlayer?.[4] ?? rightPlayer?.[4])
+    }
     return [nextPlayer]
   })
 
-  return {
+  const alivePlayers = left.alivePlayers ?? right.alivePlayers
+  const aliveTeams = left.aliveTeams ?? right.aliveTeams
+  const phase = left.phase ?? right.phase
+  const frame: ReplayFrame = {
     elapsedSeconds,
     players,
     zones: interpolateZones(left.zones, right.zones, progress),
   }
+  if (alivePlayers !== undefined) frame.alivePlayers = alivePlayers
+  if (aliveTeams !== undefined) frame.aliveTeams = aliveTeams
+  if (phase !== undefined) frame.phase = phase
+  return frame
 }
 
 function getBounds(analysis: MatchAnalysis, mapName: string) {
@@ -255,6 +273,8 @@ function ReplayMap({
   mapName,
   analysis,
   currentFrame,
+  currentTime,
+  duration,
   selectedPlayerId,
   mapScale,
   mapPan,
@@ -265,6 +285,8 @@ function ReplayMap({
   mapName: string
   analysis: MatchAnalysis
   currentFrame: ReplayFrame | null
+  currentTime: number
+  duration: number
   selectedPlayerId: string
   mapScale: number
   mapPan: MapPan
@@ -301,10 +323,33 @@ function ReplayMap({
             return player ? [`${player[1]},${player[2]}`] : []
           })
           .join(" ")
-  const visibleKills = analysis.kills.filter(
+  const visibleTime = currentFrame?.elapsedSeconds ?? duration
+  const visibleKills = analysis.timeline.filter(
     (kill) =>
-      kill.elapsedSeconds === undefined ||
-      kill.elapsedSeconds <= (currentFrame?.elapsedSeconds ?? 0)
+      kill.type.includes("Kill") &&
+      (kill.elapsedSeconds === undefined || kill.elapsedSeconds <= visibleTime)
+  )
+  const visibleDamage = analysis.timeline.filter(
+    (event) =>
+      event.type.includes("Damage") &&
+      event.location &&
+      (event.elapsedSeconds === undefined ||
+        event.elapsedSeconds <= visibleTime)
+  )
+  const activeDamage = analysis.timeline.filter(
+    (event) =>
+      event.type.includes("Damage") &&
+      event.location &&
+      event.targetLocation &&
+      event.elapsedSeconds !== undefined &&
+      Math.abs(event.elapsedSeconds - currentTime) <= 1
+  )
+  const visibleCarePackages = analysis.timeline.filter(
+    (event) =>
+      event.type.includes("CarePackage") &&
+      event.location &&
+      (event.elapsedSeconds === undefined ||
+        event.elapsedSeconds <= visibleTime)
   )
   const mapAssetUrl = MAP_SIZES[mapName]
     ? `${MAP_ASSET_BASE}/${mapName}.jpg`
@@ -416,6 +461,19 @@ function ReplayMap({
               strokeDasharray={`${Math.max(bounds.width / 100000, 6)} ${Math.max(bounds.width / 70000, 8)}`}
             />
           ) : null}
+          {currentFrame?.zones?.blackzone ? (
+            <circle
+              cx={currentFrame.zones.blackzone.x}
+              cy={currentFrame.zones.blackzone.y}
+              r={currentFrame.zones.blackzone.radius}
+              fill="var(--foreground)"
+              fillOpacity="0.08"
+              stroke="var(--foreground)"
+              strokeOpacity="0.55"
+              strokeWidth={Math.max(bounds.width / 300000, 2)}
+              strokeDasharray={`${Math.max(bounds.width / 80000, 6)} ${Math.max(bounds.width / 50000, 10)}`}
+            />
+          ) : null}
           {currentFrame?.zones?.bluezone ? (
             <circle
               cx={currentFrame.zones.bluezone.x}
@@ -459,20 +517,86 @@ function ReplayMap({
           {visibleKills.map((kill, index) =>
             kill.location ? (
               <g key={`${kill.timestamp}-${index}`}>
+                <title>{kill.message}</title>
                 <circle
                   cx={kill.location.x}
                   cy={kill.location.y}
                   r={Math.max(bounds.width / 100, 8)}
-                  fill="var(--destructive)"
+                  fill={
+                    kill.actor === analysis.playerId
+                      ? "var(--destructive)"
+                      : "var(--chart-5)"
+                  }
                   fillOpacity="0.15"
-                  stroke="var(--destructive)"
+                  stroke={
+                    kill.actor === analysis.playerId
+                      ? "var(--destructive)"
+                      : "var(--chart-5)"
+                  }
                   strokeWidth={Math.max(bounds.width / 400000, 2)}
                 />
                 <circle
                   cx={kill.location.x}
                   cy={kill.location.y}
                   r={Math.max(bounds.width / 260, 4)}
-                  fill="var(--destructive)"
+                  fill={
+                    kill.actor === analysis.playerId
+                      ? "var(--destructive)"
+                      : "var(--chart-5)"
+                  }
+                />
+              </g>
+            ) : null
+          )}
+          {visibleDamage.map((event, index) =>
+            event.location ? (
+              <circle
+                key={`${event.timestamp}-${index}`}
+                cx={event.location.x}
+                cy={event.location.y}
+                r={Math.max(bounds.width / 350, 4)}
+                fill="var(--chart-3)"
+                fillOpacity="0.7"
+                stroke="var(--background)"
+                strokeWidth={Math.max(bounds.width / 500000, 2)}
+              />
+            ) : null
+          )}
+          {activeDamage.map((event, index) =>
+            event.location && event.targetLocation ? (
+              <line
+                key={`tracer-${event.timestamp}-${index}`}
+                x1={event.location.x}
+                y1={event.location.y}
+                x2={event.targetLocation.x}
+                y2={event.targetLocation.y}
+                stroke="var(--chart-3)"
+                strokeOpacity="0.8"
+                strokeWidth={Math.max(bounds.width / 180000, 3)}
+                strokeDasharray={`${Math.max(bounds.width / 70000, 8)} ${Math.max(bounds.width / 90000, 10)}`}
+                strokeLinecap="round"
+              />
+            ) : null
+          )}
+          {visibleCarePackages.map((event, index) =>
+            event.location ? (
+              <g key={`care-package-${event.timestamp}-${index}`}>
+                <rect
+                  x={event.location.x - Math.max(bounds.width / 170, 8)}
+                  y={event.location.y - Math.max(bounds.width / 170, 8)}
+                  width={Math.max(bounds.width / 85, 16)}
+                  height={Math.max(bounds.width / 85, 16)}
+                  rx={Math.max(bounds.width / 300, 4)}
+                  fill="var(--chart-4)"
+                  fillOpacity="0.9"
+                  stroke="var(--background)"
+                  strokeWidth={Math.max(bounds.width / 500000, 2)}
+                />
+                <path
+                  d={`M ${event.location.x - Math.max(bounds.width / 230, 6)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 230, 6)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 230, 6)} V ${event.location.y + Math.max(bounds.width / 230, 6)}`}
+                  stroke="var(--background)"
+                  strokeWidth={Math.max(bounds.width / 500000, 2)}
+                  strokeLinecap="round"
                 />
               </g>
             ) : null
@@ -563,11 +687,16 @@ function ReplayMap({
           轨迹：{selectedPlayer?.name ?? "已选玩家"}
         </span>
         <span className="rounded-md border bg-background/85 px-2 py-1">
-          标记：击杀事件
+          标记：击杀 / 伤害
         </span>
+        {visibleCarePackages.length ? (
+          <span className="rounded-md border bg-background/85 px-2 py-1">
+            补给箱：{visibleCarePackages.length}
+          </span>
+        ) : null}
         {currentFrame?.zones?.bluezone ? (
           <span className="rounded-md border bg-background/85 px-2 py-1">
-            蓝圈 / 白圈 / 红区
+            蓝圈 / 白圈 / 红区 / 特殊区
           </span>
         ) : null}
       </div>
@@ -704,17 +833,19 @@ function matchesTimelineFilter(
   if (filter === "combat") {
     return /Kill|Damage|Death/.test(event.type)
   }
-  return /Login|Create|Groggy|Knock|Revive|Rescue/.test(event.type)
+  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
 }
 
 function ReplayTimeline({
   events,
   currentTime,
   onSeek,
+  playerNames,
 }: {
   events: MatchAnalysis["timeline"]
   currentTime: number
   onSeek: (seconds: number) => void
+  playerNames: Map<string, string>
 }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("all")
   const [selectedEvent, setSelectedEvent] = React.useState<
@@ -863,16 +994,42 @@ function ReplayTimeline({
                     {formatEventLocation(selectedEvent.location)}
                   </dd>
                 </div>
+                {selectedEvent.targetLocation ? (
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">目标坐标</dt>
+                    <dd className="font-mono text-sm">
+                      {formatEventLocation(selectedEvent.targetLocation)}
+                    </dd>
+                  </div>
+                ) : null}
+                {selectedEvent.damage !== undefined ? (
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">伤害</dt>
+                    <dd className="text-sm">{selectedEvent.damage} 点</dd>
+                  </div>
+                ) : null}
+                {selectedEvent.damageType ? (
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">伤害类型</dt>
+                    <dd className="text-sm">{selectedEvent.damageType}</dd>
+                  </div>
+                ) : null}
                 <div className="flex flex-col gap-1">
                   <dt className="text-xs text-muted-foreground">发起玩家</dt>
                   <dd className="truncate text-sm">
-                    {selectedEvent.actor ?? "未知玩家"}
+                    {selectedEvent.actor
+                      ? (playerNames.get(selectedEvent.actor) ??
+                        selectedEvent.actor)
+                      : "未知玩家"}
                   </dd>
                 </div>
                 <div className="flex flex-col gap-1">
                   <dt className="text-xs text-muted-foreground">目标玩家</dt>
                   <dd className="truncate text-sm">
-                    {selectedEvent.target ?? "无目标玩家"}
+                    {selectedEvent.target
+                      ? (playerNames.get(selectedEvent.target) ??
+                        selectedEvent.target)
+                      : "无目标玩家"}
                   </dd>
                 </div>
               </dl>
@@ -901,6 +1058,10 @@ function ReplayHud({
     (player) => player.id === analysis.playerId
   )
   const targetState = targetIndex === -1 ? undefined : states.get(targetIndex)
+  const currentAlivePlayers = currentFrame?.alivePlayers ?? activePlayers.length
+  const currentAliveTeams = currentFrame?.aliveTeams
+  const currentPhase = currentFrame?.phase
+  const targetHealth = targetState?.[4]
   const currentKills = analysis.kills.filter(
     (event) =>
       event.elapsedSeconds === undefined || event.elapsedSeconds <= currentTime
@@ -909,21 +1070,25 @@ function ReplayHud({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
-        label="当前可识别玩家"
-        value={String(stateValues.length)}
-        detail={`${activePlayers.length} 名尚未淘汰`}
+        label="当前存活玩家"
+        value={String(currentAlivePlayers)}
+        detail={
+          currentAliveTeams !== undefined
+            ? `${currentAliveTeams} 个队伍`
+            : "根据位置帧估算"
+        }
         icon={UsersIcon}
       />
       <StatCard
-        label="已淘汰"
-        value={String(eliminatedPlayers.length)}
-        detail="基于当前时间帧"
+        label="已识别玩家"
+        value={String(stateValues.length)}
+        detail={`${eliminatedPlayers.length} 名已标记淘汰`}
         icon={SkullIcon}
       />
       <StatCard
         label="目标玩家状态"
         value={targetState ? statusLabels[targetState[3]] : "未知"}
-        detail={`T+${formatTime(currentTime)}`}
+        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${currentPhase !== undefined ? `阶段 ${currentPhase} · ` : ""}T+${formatTime(currentTime)}`}
         icon={ActivityIcon}
       />
       <StatCard
@@ -936,6 +1101,45 @@ function ReplayHud({
   )
 }
 
+function ReplayEventMarkers({
+  events,
+  duration,
+  onSeek,
+}: {
+  events: MatchAnalysis["timeline"]
+  duration: number
+  onSeek: (seconds: number) => void
+}) {
+  const markers = events.filter(
+    (event) =>
+      event.elapsedSeconds !== undefined && /Kill|Death/.test(event.type)
+  )
+  if (duration <= 0 || markers.length === 0) return null
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-1/2 h-6 -translate-y-1/2">
+      {markers.map((event, index) => {
+        const seconds = event.elapsedSeconds ?? 0
+        const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
+        return (
+          <Button
+            key={`${event.type}-${event.timestamp}-${index}`}
+            type="button"
+            size="icon-xs"
+            variant="destructive"
+            className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style={{ left: `${position}%` }}
+            aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
+            onClick={() => onSeek(seconds)}
+          >
+            <span className="size-1.5 rounded-full bg-current" />
+          </Button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function MatchReplay({
   match,
   analysis,
@@ -943,11 +1147,28 @@ export function MatchReplay({
   match: MatchSummary
   analysis: MatchAnalysis
 }) {
+  const timelineDuration = analysis.timeline.reduce(
+    (latest, event) => Math.max(latest, event.elapsedSeconds ?? 0),
+    0
+  )
+  const playerNames = React.useMemo(
+    () =>
+      new Map(
+        match.participants.map((participant) => [
+          participant.id,
+          participant.name,
+        ])
+      ),
+    [match.participants]
+  )
   const duration = Math.max(
     match.durationSeconds,
     analysis.replayDurationSeconds,
-    analysis.replayFrames.at(-1)?.elapsedSeconds ?? 0
+    analysis.replayFrames.at(-1)?.elapsedSeconds ?? 0,
+    timelineDuration
   )
+  const hasReplayFrames = analysis.replayFrames.length > 0
+  const hasStaticTrajectory = analysis.trajectory.length > 0
   const [currentTime, setCurrentTime] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
   const [speed, setSpeed] = React.useState<number>(1)
@@ -1052,13 +1273,15 @@ export function MatchReplay({
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {analysis.replayFrames.length ? (
+        {hasReplayFrames || hasStaticTrajectory ? (
           <>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <ReplayMap
                 mapName={match.mapName}
                 analysis={analysis}
                 currentFrame={currentFrame}
+                currentTime={currentTime}
+                duration={duration}
                 selectedPlayerId={selectedPlayerId}
                 mapScale={mapScale}
                 mapPan={mapPan}
@@ -1073,111 +1296,142 @@ export function MatchReplay({
                   setMapPan({ x: 0, y: 0 })
                 }}
               />
-              <Roster
-                match={match}
-                analysis={analysis}
-                currentFrame={currentFrame}
-                selectedPlayerId={selectedPlayerId}
-                onSelect={setSelectedPlayerId}
-              />
-            </div>
-            <ReplayHud
-              analysis={analysis}
-              currentFrame={currentFrame}
-              currentTime={currentTime}
-            />
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      aria-label={playing ? "暂停回放" : "播放回放"}
-                      onClick={() => {
-                        if (currentTime >= duration) setTime(0)
-                        setPlaying((value) => !value)
-                      }}
-                    >
-                      {playing ? <PauseIcon /> : <PlayIcon />}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label="重新开始"
-                      onClick={() => {
-                        setPlaying(false)
-                        setTime(0)
-                      }}
-                    >
-                      <RotateCcwIcon />
-                    </Button>
-                    <span className="font-mono text-sm tabular-nums">
-                      {formatTime(currentTime)}
-                      <span className="text-muted-foreground">
-                        {` / ${formatTime(duration)}`}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">
-                      播放速度
-                    </span>
-                    <Select
-                      value={String(speed)}
-                      onValueChange={(value) => {
-                        if (value) setSpeed(Number(value))
-                      }}
-                    >
-                      <SelectTrigger
-                        aria-label="选择播放速度"
-                        className="h-8 w-20"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {SPEEDS.map((value) => (
-                            <SelectItem key={value} value={String(value)}>
-                              {value}x
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Slider
-                  value={[currentTime]}
-                  min={0}
-                  max={Math.max(duration, 1)}
-                  step={0.1}
-                  aria-label="回放时间"
-                  onValueChange={(value) =>
-                    setTime(typeof value === "number" ? value : (value[0] ?? 0))
-                  }
+              {analysis.replayPlayers.length ? (
+                <Roster
+                  match={match}
+                  analysis={analysis}
+                  currentFrame={currentFrame}
+                  selectedPlayerId={selectedPlayerId}
+                  onSelect={setSelectedPlayerId}
                 />
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-chart-1" /> 目标玩家
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-chart-2" /> 其他玩家
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-destructive" />{" "}
-                    击杀事件
-                  </span>
-                  <span className="ml-auto inline-flex items-center gap-1.5">
-                    <CrosshairIcon className="size-3.5" />
-                    位置帧已降采样，仅保留紧凑回放数据
-                  </span>
-                  <span className="basis-full text-right sm:basis-auto">
-                    空格播放/暂停 · ←/→ 前后 5 秒
-                  </span>
-                </div>
-              </div>
+              ) : null}
             </div>
+            {hasReplayFrames ? (
+              <>
+                <ReplayHud
+                  analysis={analysis}
+                  currentFrame={currentFrame}
+                  currentTime={currentTime}
+                />
+                <div className="rounded-xl border bg-card p-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          aria-label={playing ? "暂停回放" : "播放回放"}
+                          onClick={() => {
+                            if (currentTime >= duration) setTime(0)
+                            setPlaying((value) => !value)
+                          }}
+                        >
+                          {playing ? <PauseIcon /> : <PlayIcon />}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="重新开始"
+                          onClick={() => {
+                            setPlaying(false)
+                            setTime(0)
+                          }}
+                        >
+                          <RotateCcwIcon />
+                        </Button>
+                        <span className="font-mono text-sm tabular-nums">
+                          {formatTime(currentTime)}
+                          <span className="text-muted-foreground">
+                            {` / ${formatTime(duration)}`}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          播放速度
+                        </span>
+                        <Select
+                          value={String(speed)}
+                          onValueChange={(value) => {
+                            if (value) setSpeed(Number(value))
+                          }}
+                        >
+                          <SelectTrigger
+                            aria-label="选择播放速度"
+                            className="h-8 w-20"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              {SPEEDS.map((value) => (
+                                <SelectItem key={value} value={String(value)}>
+                                  {value}x
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <Slider
+                        value={[currentTime]}
+                        min={0}
+                        max={Math.max(duration, 1)}
+                        step={0.1}
+                        aria-label="回放时间"
+                        onValueChange={(value) =>
+                          setTime(
+                            typeof value === "number" ? value : (value[0] ?? 0)
+                          )
+                        }
+                      />
+                      <ReplayEventMarkers
+                        events={analysis.timeline}
+                        duration={duration}
+                        onSeek={(seconds) => {
+                          setPlaying(false)
+                          setTime(seconds)
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-chart-1" />{" "}
+                        目标玩家
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-chart-2" />{" "}
+                        其他玩家
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-destructive" />{" "}
+                        击杀事件
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-chart-3" />{" "}
+                        伤害位置
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-sm bg-chart-4" /> 补给箱
+                      </span>
+                      <span className="ml-auto inline-flex items-center gap-1.5">
+                        <CrosshairIcon className="size-3.5" />
+                        位置帧已降采样，仅保留紧凑回放数据
+                      </span>
+                      <span className="basis-full text-right sm:basis-auto">
+                        空格播放/暂停 · ←/→ 前后 5 秒
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-card px-4 py-5 text-sm text-muted-foreground">
+                当前遥测只包含目标玩家静态轨迹，暂时无法进行逐帧播放；事件时间线仍可用于定位比赛节点。
+              </div>
+            )}
           </>
         ) : (
           <div className="rounded-xl border border-dashed px-6 py-16 text-center">
@@ -1192,6 +1446,7 @@ export function MatchReplay({
           <ReplayTimeline
             events={analysis.timeline}
             currentTime={currentTime}
+            playerNames={playerNames}
             onSeek={(seconds) => {
               setPlaying(false)
               setTime(seconds)

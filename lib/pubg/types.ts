@@ -70,13 +70,22 @@ export interface MatchSummary {
   source: "api" | "cache"
 }
 
+export interface TelemetryLocation {
+  x: number
+  y: number
+  z?: number
+}
+
 export interface TelemetryEvent {
   type: string
   timestamp: string | null
   elapsedSeconds?: number
   actor: string | null
   target: string | null
-  location: { x: number; y: number; z?: number } | null
+  location: TelemetryLocation | null
+  targetLocation?: TelemetryLocation
+  damage?: number
+  damageType?: string
   message: string
 }
 
@@ -97,6 +106,7 @@ export interface ReplayZones {
   bluezone: ReplayZone | null
   safezone: ReplayZone | null
   redzone: ReplayZone | null
+  blackzone: ReplayZone | null
 }
 
 export type ReplayFramePlayer = [
@@ -104,12 +114,16 @@ export type ReplayFramePlayer = [
   x: number,
   y: number,
   status: ReplayPlayerStatus,
+  health?: number,
 ]
 
 export interface ReplayFrame {
   elapsedSeconds: number
   players: ReplayFramePlayer[]
   zones?: ReplayZones
+  alivePlayers?: number
+  aliveTeams?: number
+  phase?: number
 }
 
 export interface MatchAnalysis {
