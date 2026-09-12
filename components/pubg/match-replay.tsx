@@ -113,7 +113,7 @@ const eventTypeLabels: Record<string, string> = {
   LogPlayerLogin: "玩家加入",
   LogPlayerMakeGroggy: "击倒",
   LogPlayerRevive: "救起",
-  LogPlayerTakeDamage: "受到伤害",
+  LogPlayerTakeDamage: "伤害",
   LogCarePackageLand: "补给箱落地",
   LogCarePackageSpawn: "补给箱生成",
   LogVehicleLeave: "离开载具",
@@ -152,6 +152,10 @@ function formatEventLocation(
 
 function formatDamage(damage: number) {
   return String(Math.round(damage * 10) / 10)
+}
+
+function formatPhase(phase: number) {
+  return String(Math.round(phase * 10) / 10)
 }
 
 function interpolateZone(
@@ -1272,7 +1276,7 @@ function ReplayHud({
       <StatCard
         label="目标玩家状态"
         value={targetState ? statusLabels[targetState[3]] : "未知"}
-        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${targetVehicle ? "载具移动 · " : ""}${currentPhase !== undefined ? `阶段 ${currentPhase} · ` : ""}T+${formatTime(currentTime)}`}
+        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${targetVehicle ? "载具移动 · " : ""}${currentPhase !== undefined ? `阶段 ${formatPhase(currentPhase)} · ` : ""}T+${formatTime(currentTime)}`}
         icon={ActivityIcon}
       />
       <StatCard

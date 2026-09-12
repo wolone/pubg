@@ -404,6 +404,27 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toContain("34.5 点伤害")
   })
 
+  it("describes incoming damage without inventing an attacker", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          _D: "2026-09-12T10:01:00Z",
+          damage: 12.34,
+          victim: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 100, y: 200 },
+          },
+        },
+      ],
+      "account.123",
+      "match-incoming-damage"
+    )
+
+    expect(analysis.timeline[0]?.message).toBe("TestPlayer 受到 12.3 点伤害")
+  })
+
   it("does not expose the transport aircraft as a player vehicle", () => {
     const analysis = parseTelemetry(
       [

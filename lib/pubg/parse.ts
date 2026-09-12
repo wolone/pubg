@@ -785,9 +785,13 @@ function timelineMessage(
   if (type.includes("Kill"))
     return `${actor ?? "玩家"} 淘汰了 ${target ?? "对手"}`
   if (type.includes("Damage")) {
-    return damage === undefined
-      ? `${actor ?? "玩家"} 造成了一次伤害`
-      : `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${formatDamage(damage)} 点伤害`
+    if (damage === undefined) {
+      return target && !actor
+        ? `${target} 受到了一次伤害`
+        : `${actor ?? "玩家"} 造成了一次伤害`
+    }
+    if (!actor && target) return `${target} 受到 ${formatDamage(damage)} 点伤害`
+    return `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${formatDamage(damage)} 点伤害`
   }
   if (type === "LogPlayerAttack") return `${actor ?? "玩家"} 开火`
   if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
