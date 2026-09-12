@@ -34,18 +34,18 @@ PUBG_API_KEY=your-pubg-api-key
 
 ## Cloudflare D1 与部署
 
-当前 `wrangler.jsonc` 已声明 `DB` 绑定、`pubg-stats` 数据库名以及 local/preview/production 环境。首次部署前，在已登录 Cloudflare 的终端执行：
+当前 `wrangler.jsonc` 已声明 `DB` 绑定、`pubg` 数据库名以及 local/preview/production 环境。首次部署前，在已登录 Cloudflare 的终端执行：
 
 ```bash
 pnpm wrangler login
-pnpm wrangler d1 create pubg-stats --location apac
+pnpm wrangler d1 create pubg --location apac
 pnpm wrangler secret put PUBG_API_KEY
 pnpm wrangler types cloudflare-env.d.ts --env-interface CloudflareBindings --include-runtime=false
 pnpm db:migrate:remote
 pnpm deploy:vinext
 ```
 
-将 `wrangler d1 create` 输出的真实 `database_id` 填入 production（如使用 preview，也填入 preview）配置后再执行远程迁移和部署。远程迁移不会被部署脚本自动执行。
+生产环境已绑定现有的 `pubg` 数据库；如启用 preview 环境，请先创建 `pubg-preview` 数据库并将返回的 `database_id` 填入 preview 配置。远程迁移不会被部署脚本自动执行。
 
 ## API 路由
 

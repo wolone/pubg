@@ -17,9 +17,9 @@
     "preview:worker": "vinext build && wrangler dev --config dist/server/wrangler.json",
     "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json",
     "build:worker": "vinext build",
-    "db:migrate:local": "wrangler d1 migrations apply pubg-stats --local",
-    "db:migrate:remote": "wrangler d1 migrations apply pubg-stats --remote",
-    "db:status": "wrangler d1 migrations list pubg-stats --local"
+    "db:migrate:local": "wrangler d1 migrations apply pubg --local",
+    "db:migrate:remote": "wrangler d1 migrations apply pubg --remote",
+    "db:status": "wrangler d1 migrations list pubg --local"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

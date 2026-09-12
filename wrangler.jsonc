@@ -8,16 +8,9 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "pubg-stats",
-			"migrations_dir": "./migrations",
-			// Add the UUID returned by `wrangler d1 create pubg-stats --location apac`
-			// as `database_id` before a remote migration or production deploy.
-		},
-		{
-			"binding": "pubg",
 			"database_name": "pubg",
 			"database_id": "8085d927-8a8e-40c3-8818-a93d740b61fb",
-			"remote": true
+			"migrations_dir": "./migrations",
 		},
 	],
 	"env": {
@@ -26,7 +19,7 @@
 			"d1_databases": [
 				{
 					"binding": "DB",
-					"database_name": "pubg-stats-preview",
+					"database_name": "pubg-preview",
 					"migrations_dir": "./migrations",
 					// Add `database_id` after creating the preview D1 database.
 				},
@@ -37,9 +30,9 @@
 			"d1_databases": [
 				{
 					"binding": "DB",
-					"database_name": "pubg-stats",
+					"database_name": "pubg",
+					"database_id": "8085d927-8a8e-40c3-8818-a93d740b61fb",
 					"migrations_dir": "./migrations",
-					// Add `database_id` after creating the production D1 database.
 				},
 			],
 		},
