@@ -49,6 +49,7 @@ export interface SeasonStats {
 export interface MatchParticipant {
   id: string
   name: string
+  teamId?: number
   rank: number | null
   kills: number
   damage: number
@@ -94,6 +95,7 @@ export type ReplayPlayerStatus = "alive" | "knocked" | "dead"
 export interface ReplayPlayer {
   id: string
   name: string
+  teamId?: number
 }
 
 export interface ReplayZone {
@@ -120,10 +122,16 @@ export type ReplayFramePlayer = [
 export interface ReplayFrame {
   elapsedSeconds: number
   players: ReplayFramePlayer[]
+  vehicles?: ReplayFrameVehicle[]
   zones?: ReplayZones
   alivePlayers?: number
   aliveTeams?: number
   phase?: number
+}
+
+export interface ReplayFrameVehicle {
+  playerIndex: number
+  vehicleType: string
 }
 
 export interface MatchAnalysis {

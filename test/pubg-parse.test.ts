@@ -116,6 +116,52 @@ describe("PUBG JSON:API parser", () => {
     })
   })
 
+  it("carries participant group ids into replay players", () => {
+    const match = parseMatchDocument(
+      {
+        data: { type: "match", id: "match-team" },
+        included: [
+          {
+            type: "participant",
+            id: "participant-team",
+            attributes: {
+              stats: {
+                playerId: "account.team-player",
+                name: "TeamPlayer",
+                groupId: 7,
+              },
+            },
+          },
+        ],
+      },
+      "steam",
+      "account.team-player"
+    )
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.team-player",
+            name: "TeamPlayer",
+            teamId: 7,
+            location: { x: 10, y: 20 },
+          },
+        },
+      ],
+      "account.team-player",
+      "match-team"
+    )
+
+    expect(match.participants[0]?.teamId).toBe(7)
+    expect(analysis.replayPlayers[0]).toEqual({
+      id: "account.team-player",
+      name: "TeamPlayer",
+      teamId: 7,
+    })
+  })
+
   it("uses match participant names when telemetry omits account ids", () => {
     const analysis = parseTelemetry(
       [
@@ -273,7 +319,7 @@ describe("PUBG JSON:API parser", () => {
         {
           _T: "LogPhaseChange",
           elapsedTime: 45,
-          phase: 2,
+          common: { isGame: 2 },
         },
       ],
       "account.123",
@@ -391,6 +437,105 @@ describe("PUBG JSON:API parser", () => {
     expect(
       analysis.timeline.some((event) => event.type === "LogPlayerDeath")
     ).toBe(true)
+  })
+
+  it("attributes LogPlayerKillV2 to the final finisher", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerKillV2",
+          elapsedTime: 12,
+          killer: {
+            accountId: "account.knocker",
+            name: "Knocker",
+            location: { x: 100, y: 100 },
+          },
+          finisher: {
+            accountId: "account.finisher",
+            name: "Finisher",
+            location: { x: 120, y: 120 },
+          },
+          victim: {
+            accountId: "account.victim",
+            name: "Victim",
+            location: { x: 130, y: 130 },
+          },
+        },
+      ],
+      "account.finisher",
+      "match-kill-v2"
+    )
+
+    expect(analysis.kills[0]).toMatchObject({
+      actor: "account.finisher",
+      target: "account.victim",
+      location: { x: 120, y: 120 },
+    })
+    expect(analysis.kills[0]?.message).toBe("Finisher 淘汰了 Victim")
+  })
+
+  it("keeps player attack events as compact combat timeline entries", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerAttack",
+          elapsedTime: 18,
+          attacker: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 200, y: 300 },
+          },
+          attackType: "Weapon",
+        },
+      ],
+      "account.123",
+      "match-attack"
+    )
+
+    expect(analysis.timeline[0]).toMatchObject({
+      type: "LogPlayerAttack",
+      actor: "account.123",
+      location: { x: 200, y: 300 },
+      message: "TestPlayer 开火",
+    })
+    expect(analysis.trajectory).toEqual([{ x: 200, y: 300, z: 0 }])
+  })
+
+  it("tracks vehicle state without retaining raw vehicle telemetry", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 200, y: 300 },
+          },
+          vehicle: { vehicleType: "Dacia" },
+        },
+        {
+          _T: "LogVehicleLeave",
+          elapsedTime: 5,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 250, y: 350 },
+          },
+          vehicle: { vehicleType: "Dacia" },
+        },
+      ],
+      "account.123",
+      "match-vehicle"
+    )
+
+    expect(analysis.timeline.map((event) => event.message)).toEqual([
+      "TestPlayer 离开载具",
+    ])
+    expect(analysis.replayFrames[0]?.vehicles).toEqual([
+      { playerIndex: 0, vehicleType: "Dacia" },
+    ])
+    expect(analysis.replayFrames.at(-1)?.vehicles).toBeUndefined()
   })
 
   it("carries player health through replay frames", () => {

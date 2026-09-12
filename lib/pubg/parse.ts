@@ -5,6 +5,7 @@ import type {
   Platform,
   ReplayFrame,
   ReplayFramePlayer,
+  ReplayFrameVehicle,
   ReplayPlayer,
   ReplayPlayerStatus,
   ReplayZones,
@@ -145,9 +146,11 @@ export function parseSeasonStats(
 
 function parseParticipant(resource: JsonApiResource): MatchParticipant {
   const stats = (resource.attributes?.stats ?? {}) as Record<string, unknown>
+  const teamId = optionalInteger(stats.groupId ?? stats.teamId)
   return {
     id: stringValue(stats.playerId, resource.id),
     name: stringValue(stats.name, resource.id),
+    ...(teamId !== undefined ? { teamId } : {}),
     rank: Number.isFinite(Number(stats.winPlace))
       ? Number(stats.winPlace)
       : null,
@@ -249,6 +252,9 @@ export function parseTelemetry(
     replayPlayersById.set(participant.id, {
       id: participant.id,
       name: participant.name,
+      ...(participant.teamId !== undefined
+        ? { teamId: participant.teamId }
+        : {}),
     })
   }
 
@@ -263,9 +269,11 @@ export function parseTelemetry(
       stringValue(event._D, stringValue(event.timestamp, "")) || null
     const attacker =
       telemetryCharacter(event, "attacker") ??
+      telemetryCharacter(event, "finisher") ??
       telemetryCharacter(event, "killer")
     const victim = telemetryCharacter(event, "victim")
     const character = telemetryCharacter(event, "character")
+    const vehicle = telemetryCharacter(event, "vehicle")
     const itemPackage = telemetryCharacter(event, "itemPackage")
     const location =
       locationOf(character?.location) ??
@@ -276,6 +284,9 @@ export function parseTelemetry(
     const characterName = stringValue(character?.name, "")
     const attackerName = stringValue(attacker?.name, "")
     const victimName = stringValue(victim?.name, "")
+    const characterTeamId = optionalInteger(character?.teamId)
+    const attackerTeamId = optionalInteger(attacker?.teamId)
+    const victimTeamId = optionalInteger(victim?.teamId)
     const characterId =
       stringValue(character?.accountId, "") ||
       participantIdsByName.get(characterName) ||
@@ -295,20 +306,39 @@ export function parseTelemetry(
     const damage = optionalNonNegativeNumber(event.damage)
     const damageType = stringValue(event.damageTypeCategory, "") || undefined
     const replaySnapshot = parseReplaySnapshot(event)
-    const phase = optionalNonNegativeNumber(event.phase)
+    const phase = replayPhaseOf(event)
+    const vehicleType = vehicleTypeOf(vehicle)
+    const isVehicleLeave = /VehicleLeave|PlayerLeaveVehicle/i.test(type)
+    const vehicleState =
+      isVehicleLeave ||
+      (Object.prototype.hasOwnProperty.call(event, "vehicle") &&
+        event.vehicle === null)
+        ? null
+        : vehicleType
 
     if (characterId) {
       registerReplayPlayer(
         replayPlayersById,
         characterId,
-        characterName || characterId
+        characterName || characterId,
+        characterTeamId
       )
     }
     if (actor) {
-      registerReplayPlayer(replayPlayersById, actor, attackerName || actor)
+      registerReplayPlayer(
+        replayPlayersById,
+        actor,
+        attackerName || actor,
+        attackerTeamId ?? characterTeamId
+      )
     }
     if (target) {
-      registerReplayPlayer(replayPlayersById, target, victimName || target)
+      registerReplayPlayer(
+        replayPlayersById,
+        target,
+        victimName || target,
+        victimTeamId
+      )
     }
 
     if (replaySnapshot || phase !== undefined) {
@@ -319,19 +349,27 @@ export function parseTelemetry(
       })
     }
 
-    if (location && (characterId || actor)) {
-      const replayPlayerId = characterId ?? actor
-      if (replayPlayerId) {
+    const replayPlayerId = characterId ?? actor
+    if (replayPlayerId) {
+      if (location) {
         replayChanges.push({
           elapsedSeconds,
           playerId: replayPlayerId,
           location,
           health,
+          vehicleType: vehicleState,
         })
         positionCounts.set(
           replayPlayerId,
           (positionCounts.get(replayPlayerId) ?? 0) + 1
         )
+      }
+      if (!location && vehicleState !== undefined) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: replayPlayerId,
+          vehicleType: vehicleState,
+        })
       }
     }
 
@@ -399,9 +437,12 @@ export function parseTelemetry(
     const isRelevant =
       type.includes("Kill") ||
       type.includes("Damage") ||
+      type === "LogPlayerAttack" ||
       type.includes("Death") ||
       /groggy|knock|revive|rescue/i.test(type) ||
       type.includes("CarePackage") ||
+      type.includes("VehicleRide") ||
+      type.includes("VehicleLeave") ||
       type === "LogPlayerPosition" ||
       type === "LogPlayerLogin" ||
       type === "LogPlayerCreate"
@@ -463,6 +504,7 @@ type ReplayChange = {
   location?: { x: number; y: number; z?: number } | null
   status?: ReplayPlayerStatus
   health?: number
+  vehicleType?: string | null
   zones?: ReplayZones
   alivePlayers?: number
   aliveTeams?: number
@@ -474,6 +516,7 @@ type ReplayState = {
   y: number
   status: ReplayPlayerStatus
   health?: number
+  vehicleType?: string
 }
 
 function timestampOf(event: Record<string, unknown>): number | null {
@@ -509,14 +552,58 @@ function elapsedTimeOf(
 function registerReplayPlayer(
   players: Map<string, ReplayPlayer>,
   id: string,
-  name: string
+  name: string,
+  teamId?: number
 ) {
-  if (!players.has(id)) players.set(id, { id, name })
+  const existing = players.get(id)
+  if (!existing) {
+    players.set(id, {
+      id,
+      name,
+      ...(teamId !== undefined ? { teamId } : {}),
+    })
+    return
+  }
+  if (existing.teamId === undefined && teamId !== undefined) {
+    players.set(id, { ...existing, teamId })
+  }
 }
 
 function optionalNonNegativeNumber(value: unknown) {
   const number = numberValue(value, Number.NaN)
   return Number.isFinite(number) && number >= 0 ? number : undefined
+}
+
+function optionalInteger(value: unknown) {
+  const number =
+    typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : numberValue(value, Number.NaN)
+  return Number.isInteger(number) && number >= 0 ? number : undefined
+}
+
+function vehicleTypeOf(vehicle: Record<string, unknown> | undefined) {
+  if (!vehicle) return undefined
+  return (
+    stringValue(vehicle.vehicleType, stringValue(vehicle.vehicleId, "")) ||
+    undefined
+  )
+}
+
+function replayPhaseOf(event: Record<string, unknown>) {
+  const directPhase = optionalNonNegativeNumber(event.phase)
+  if (directPhase !== undefined) return directPhase
+  const common = event.common
+  if (common && typeof common === "object") {
+    const commonPhase = optionalNonNegativeNumber(
+      (common as Record<string, unknown>).isGame
+    )
+    if (commonPhase !== undefined) return commonPhase
+  }
+  const value = event.gameState
+  if (!value || typeof value !== "object") return undefined
+  const gameState = value as Record<string, unknown>
+  return optionalNonNegativeNumber(gameState.isGame ?? gameState.phase)
 }
 
 function optionalPercentageNumber(value: unknown) {
@@ -611,15 +698,29 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
             y: change.location.y,
             status: change.status ?? previous?.status ?? "alive",
             health: change.health ?? previous?.health,
+            ...(change.vehicleType !== undefined
+              ? change.vehicleType === null
+                ? {}
+                : { vehicleType: change.vehicleType }
+              : previous?.vehicleType
+                ? { vehicleType: previous.vehicleType }
+                : {}),
           })
         } else if (
           previous &&
-          (change.status !== undefined || change.health !== undefined)
+          (change.status !== undefined ||
+            change.health !== undefined ||
+            change.vehicleType !== undefined)
         ) {
           states.set(change.playerId, {
             ...previous,
             ...(change.status ? { status: change.status } : {}),
             ...(change.health !== undefined ? { health: change.health } : {}),
+            ...(change.vehicleType !== undefined
+              ? change.vehicleType === null
+                ? { vehicleType: undefined }
+                : { vehicleType: change.vehicleType }
+              : {}),
           })
         }
       }
@@ -642,8 +743,16 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       .filter((player): player is ReplayFrame["players"][number] =>
         Boolean(player)
       )
+    const frameVehicles: ReplayFrameVehicle[] = Array.from(states.entries())
+      .map(([id, state]) => {
+        const playerIndex = playerIndexById.get(id)
+        if (playerIndex === undefined || !state.vehicleType) return null
+        return { playerIndex, vehicleType: state.vehicleType }
+      })
+      .filter((vehicle): vehicle is ReplayFrameVehicle => Boolean(vehicle))
     if (
       framePlayers.length ||
+      frameVehicles.length ||
       zones ||
       alivePlayers !== undefined ||
       aliveTeams !== undefined ||
@@ -653,6 +762,7 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
         elapsedSeconds: Math.round(elapsedSeconds * 10) / 10,
         players: framePlayers,
       }
+      if (frameVehicles.length) frame.vehicles = frameVehicles
       if (zones) frame.zones = zones
       if (alivePlayers !== undefined) frame.alivePlayers = alivePlayers
       if (aliveTeams !== undefined) frame.aliveTeams = aliveTeams
@@ -677,12 +787,15 @@ function timelineMessage(
       ? `${actor ?? "玩家"} 造成了一次伤害`
       : `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${damage} 点伤害`
   }
+  if (type === "LogPlayerAttack") return `${actor ?? "玩家"} 开火`
   if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
   if (/revive|rescue/i.test(type)) return `${target ?? actor ?? "玩家"} 被救起`
   if (type.includes("Death")) return `${target ?? actor ?? "玩家"} 被淘汰`
   if (type.includes("CarePackage")) {
     return type.includes("Land") ? "补给箱已落地" : "补给箱已生成"
   }
+  if (type.includes("VehicleRide")) return `${actor ?? "玩家"} 进入载具`
+  if (type.includes("VehicleLeave")) return `${actor ?? "玩家"} 离开载具`
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
   return type

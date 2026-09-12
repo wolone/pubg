@@ -222,11 +222,13 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
   const alivePlayers = left.alivePlayers ?? right.alivePlayers
   const aliveTeams = left.aliveTeams ?? right.aliveTeams
   const phase = left.phase ?? right.phase
+  const vehicles = progress < 0.5 ? left.vehicles : right.vehicles
   const frame: ReplayFrame = {
     elapsedSeconds,
     players,
     zones: interpolateZones(left.zones, right.zones, progress),
   }
+  if (vehicles?.length) frame.vehicles = vehicles
   if (alivePlayers !== undefined) frame.alivePlayers = alivePlayers
   if (aliveTeams !== undefined) frame.aliveTeams = aliveTeams
   if (phase !== undefined) frame.phase = phase
@@ -302,12 +304,23 @@ function ReplayMap({
     () => currentStates(currentFrame),
     [currentFrame]
   )
+  const vehicleIndexes = React.useMemo(
+    () =>
+      new Map(
+        currentFrame?.vehicles?.map((vehicle) => [
+          vehicle.playerIndex,
+          vehicle,
+        ]) ?? []
+      ),
+    [currentFrame]
+  )
   const path = analysis.trajectory
     .map((point) => `${point.x},${point.y}`)
     .join(" ")
   const targetIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === analysis.playerId
   )
+  const targetTeamId = analysis.replayPlayers[targetIndex]?.teamId
   const selectedIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === selectedPlayerId
   )
@@ -332,6 +345,13 @@ function ReplayMap({
   const visibleDamage = analysis.timeline.filter(
     (event) =>
       event.type.includes("Damage") &&
+      event.location &&
+      (event.elapsedSeconds === undefined ||
+        event.elapsedSeconds <= visibleTime)
+  )
+  const visibleAttacks = analysis.timeline.filter(
+    (event) =>
+      event.type === "LogPlayerAttack" &&
       event.location &&
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
@@ -562,6 +582,20 @@ function ReplayMap({
               />
             ) : null
           )}
+          {visibleAttacks.map((event, index) =>
+            event.location ? (
+              <g key={`attack-${event.timestamp}-${index}`}>
+                <title>{event.message}</title>
+                <path
+                  d={`M ${event.location.x - Math.max(bounds.width / 260, 5)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 260, 5)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 260, 5)} V ${event.location.y + Math.max(bounds.width / 260, 5)}`}
+                  stroke="var(--chart-1)"
+                  strokeOpacity="0.8"
+                  strokeWidth={Math.max(bounds.width / 500000, 2)}
+                  strokeLinecap="round"
+                />
+              </g>
+            ) : null
+          )}
           {activeDamage.map((event, index) =>
             event.location && event.targetLocation ? (
               <line
@@ -607,6 +641,10 @@ function ReplayMap({
               if (!player) return null
               const isTarget = playerIndex === targetIndex
               const isSelected = playerIndex === selectedIndex
+              const isTeammate =
+                !isTarget &&
+                targetTeamId !== undefined &&
+                player.teamId === targetTeamId
               const radius = Math.max(bounds.width / (isTarget ? 90 : 180), 7)
               return (
                 <g key={player.id}>
@@ -630,6 +668,31 @@ function ReplayMap({
                       stroke="var(--chart-4)"
                       strokeOpacity="0.55"
                       strokeWidth={Math.max(bounds.width / 300000, 2)}
+                    />
+                  ) : null}
+                  {isTeammate ? (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={radius * 1.65}
+                      fill="none"
+                      stroke="var(--chart-2)"
+                      strokeOpacity="0.65"
+                      strokeWidth={Math.max(bounds.width / 300000, 2)}
+                      strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 70000, 8)}`}
+                    />
+                  ) : null}
+                  {vehicleIndexes.has(playerIndex) ? (
+                    <rect
+                      x={x - radius * 1.25}
+                      y={y - radius * 1.25}
+                      width={radius * 2.5}
+                      height={radius * 2.5}
+                      rx={radius * 0.35}
+                      fill="none"
+                      stroke="var(--chart-4)"
+                      strokeOpacity="0.9"
+                      strokeWidth={Math.max(bounds.width / 320000, 2)}
                     />
                   ) : null}
                   <circle
@@ -687,7 +750,7 @@ function ReplayMap({
           轨迹：{selectedPlayer?.name ?? "已选玩家"}
         </span>
         <span className="rounded-md border bg-background/85 px-2 py-1">
-          标记：击杀 / 伤害
+          标记：击杀 / 伤害 / 开火 / 载具
         </span>
         {visibleCarePackages.length ? (
           <span className="rounded-md border bg-background/85 px-2 py-1">
@@ -744,6 +807,10 @@ function Roster({
   onSelect: (playerId: string) => void
 }) {
   const states = currentStates(currentFrame)
+  const vehicles = new Map(
+    currentFrame?.vehicles?.map((vehicle) => [vehicle.playerIndex, vehicle]) ??
+      []
+  )
   const indexById = new Map(
     analysis.replayPlayers.map((player, index) => [player.id, index])
   )
@@ -760,6 +827,9 @@ function Roster({
       if (right.player.id === analysis.playerId) return 1
       return (left.participant?.rank ?? 999) - (right.participant?.rank ?? 999)
     })
+  const targetTeamId = analysis.replayPlayers.find(
+    (player) => player.id === analysis.playerId
+  )?.teamId
 
   return (
     <div className="rounded-xl border bg-card">
@@ -778,6 +848,8 @@ function Roster({
             const playerIndex = indexById.get(player.id)
             const state =
               playerIndex === undefined ? undefined : states.get(playerIndex)
+            const vehicle =
+              playerIndex === undefined ? undefined : vehicles.get(playerIndex)
             const isTarget = player.id === analysis.playerId
             const isSelected = player.id === selectedPlayerId
             return (
@@ -803,6 +875,20 @@ function Roster({
                   {player.name}
                 </span>
                 {isTarget ? <Badge variant="secondary">目标</Badge> : null}
+                {player.teamId !== undefined ? (
+                  <Badge
+                    variant={
+                      player.teamId === targetTeamId ? "secondary" : "outline"
+                    }
+                  >
+                    队 {player.teamId}
+                  </Badge>
+                ) : null}
+                {vehicle ? (
+                  <Badge variant="outline" title={vehicle.vehicleType}>
+                    载具
+                  </Badge>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                   {state
                     ? statusLabels[state[3]]
@@ -831,9 +917,11 @@ function matchesTimelineFilter(
 ) {
   if (filter === "all") return true
   if (filter === "combat") {
-    return /Kill|Damage|Death/.test(event.type)
+    return /Kill|Damage|Death|Attack/.test(event.type)
   }
-  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
+  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
+    event.type
+  )
 }
 
 function ReplayTimeline({
@@ -928,7 +1016,9 @@ function ReplayTimeline({
                       event.type.includes("Kill") ? "default" : "outline"
                     }
                   >
-                    {event.type.replace("LogPlayer", "")}
+                    {event.type === "LogPlayerAttack"
+                      ? "开火"
+                      : event.type.replace("LogPlayer", "")}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {event.message}
@@ -1043,10 +1133,12 @@ function ReplayTimeline({
 
 function ReplayHud({
   analysis,
+  participantCount,
   currentFrame,
   currentTime,
 }: {
   analysis: MatchAnalysis
+  participantCount: number
   currentFrame: ReplayFrame | null
   currentTime: number
 }) {
@@ -1058,10 +1150,19 @@ function ReplayHud({
     (player) => player.id === analysis.playerId
   )
   const targetState = targetIndex === -1 ? undefined : states.get(targetIndex)
-  const currentAlivePlayers = currentFrame?.alivePlayers ?? activePlayers.length
   const currentAliveTeams = currentFrame?.aliveTeams
   const currentPhase = currentFrame?.phase
   const targetHealth = targetState?.[4]
+  const targetVehicle = currentFrame?.vehicles?.find(
+    (vehicle) => vehicle.playerIndex === targetIndex
+  )
+  const hasFullPositionCoverage =
+    participantCount === 0 || analysis.replayPlayers.length >= participantCount
+  const estimatedAlivePlayers = hasFullPositionCoverage
+    ? activePlayers.length
+    : undefined
+  const reliableAlivePlayers =
+    currentFrame?.alivePlayers ?? estimatedAlivePlayers
   const currentKills = analysis.kills.filter(
     (event) =>
       event.elapsedSeconds === undefined || event.elapsedSeconds <= currentTime
@@ -1071,11 +1172,19 @@ function ReplayHud({
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         label="当前存活玩家"
-        value={String(currentAlivePlayers)}
+        value={
+          reliableAlivePlayers === undefined
+            ? "—"
+            : String(reliableAlivePlayers)
+        }
         detail={
           currentAliveTeams !== undefined
             ? `${currentAliveTeams} 个队伍`
-            : "根据位置帧估算"
+            : currentFrame?.alivePlayers !== undefined
+              ? "官方遥测"
+              : reliableAlivePlayers !== undefined
+                ? "根据完整位置帧估算"
+                : "官方遥测未提供存活数"
         }
         icon={UsersIcon}
       />
@@ -1088,7 +1197,7 @@ function ReplayHud({
       <StatCard
         label="目标玩家状态"
         value={targetState ? statusLabels[targetState[3]] : "未知"}
-        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${currentPhase !== undefined ? `阶段 ${currentPhase} · ` : ""}T+${formatTime(currentTime)}`}
+        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${targetVehicle ? "载具移动 · " : ""}${currentPhase !== undefined ? `阶段 ${currentPhase} · ` : ""}T+${formatTime(currentTime)}`}
         icon={ActivityIcon}
       />
       <StatCard
@@ -1112,7 +1221,7 @@ function ReplayEventMarkers({
 }) {
   const markers = events.filter(
     (event) =>
-      event.elapsedSeconds !== undefined && /Kill|Death/.test(event.type)
+      event.elapsedSeconds !== undefined && /Kill|Death|Attack/.test(event.type)
   )
   if (duration <= 0 || markers.length === 0) return null
 
@@ -1126,7 +1235,9 @@ function ReplayEventMarkers({
             key={`${event.type}-${event.timestamp}-${index}`}
             type="button"
             size="icon-xs"
-            variant="destructive"
+            variant={
+              event.type.includes("Attack") ? "secondary" : "destructive"
+            }
             className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{ left: `${position}%` }}
             aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
@@ -1151,16 +1262,18 @@ export function MatchReplay({
     (latest, event) => Math.max(latest, event.elapsedSeconds ?? 0),
     0
   )
-  const playerNames = React.useMemo(
-    () =>
-      new Map(
-        match.participants.map((participant) => [
-          participant.id,
-          participant.name,
-        ])
-      ),
-    [match.participants]
-  )
+  const playerNames = React.useMemo(() => {
+    const names = new Map(
+      match.participants.map((participant) => [
+        participant.id,
+        participant.name,
+      ])
+    )
+    for (const player of analysis.replayPlayers) {
+      if (!names.has(player.id)) names.set(player.id, player.name)
+    }
+    return names
+  }, [analysis.replayPlayers, match.participants])
   const duration = Math.max(
     match.durationSeconds,
     analysis.replayDurationSeconds,
@@ -1310,6 +1423,7 @@ export function MatchReplay({
               <>
                 <ReplayHud
                   analysis={analysis}
+                  participantCount={match.participantCount}
                   currentFrame={currentFrame}
                   currentTime={currentTime}
                 />
@@ -1403,7 +1517,11 @@ export function MatchReplay({
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-full bg-chart-2" />{" "}
-                        其他玩家
+                        其他玩家状态
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full border-2 border-dashed border-chart-2" />{" "}
+                        同队玩家
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-full bg-destructive" />{" "}
@@ -1414,7 +1532,15 @@ export function MatchReplay({
                         伤害位置
                       </span>
                       <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-full border border-chart-1" />{" "}
+                        开火位置
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-sm bg-chart-4" /> 补给箱
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rounded-sm border border-chart-4" />{" "}
+                        载具移动
                       </span>
                       <span className="ml-auto inline-flex items-center gap-1.5">
                         <CrosshairIcon className="size-3.5" />
