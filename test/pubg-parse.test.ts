@@ -437,6 +437,9 @@ describe("PUBG JSON:API parser", () => {
     expect(
       analysis.timeline.some((event) => event.type === "LogPlayerDeath")
     ).toBe(true)
+    expect(
+      analysis.timeline.some((event) => event.type === "LogPlayerTakeDamage")
+    ).toBe(true)
   })
 
   it("attributes LogPlayerKillV2 to the final finisher", () => {

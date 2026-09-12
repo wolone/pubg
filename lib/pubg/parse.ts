@@ -489,7 +489,8 @@ export function parseTelemetry(
     kills,
     timeline: compactTimeline(
       timeline.filter((event) => event.type !== "LogPlayerPosition"),
-      120
+      120,
+      playerId
     ),
     trajectory: downsample(trajectory, 240),
     replayPlayers,
@@ -801,20 +802,43 @@ function timelineMessage(
   return type
 }
 
-function compactTimeline(events: TelemetryEvent[], max: number) {
+function compactTimeline(
+  events: TelemetryEvent[],
+  max: number,
+  focusPlayerId?: string
+) {
   if (events.length <= max) return events
 
-  const important = events.filter((event) =>
-    /Kill|Death|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
+  const critical = events.filter((event) =>
+    /Kill|Death|Groggy|Knock|Revive|Rescue/.test(event.type)
   )
-  const secondary = events.filter(
+  const carePackages = events.filter((event) =>
+    event.type.includes("CarePackage")
+  )
+  const focusedCombat = events.filter(
     (event) =>
-      !/Kill|Death|Groggy|Knock|Revive|Rescue|CarePackage/.test(event.type)
+      (event.type.includes("Damage") || event.type === "LogPlayerAttack") &&
+      focusPlayerId !== undefined &&
+      (event.actor === focusPlayerId || event.target === focusPlayerId)
   )
-  const selected = [
-    ...important.slice(0, max),
-    ...downsample(secondary, Math.max(0, max - important.length)),
-  ]
+  const selected: TelemetryEvent[] = []
+  const selectedSet = new Set<TelemetryEvent>()
+  const add = (items: TelemetryEvent[], budget: number) => {
+    for (const event of downsample(items, budget)) {
+      if (selectedSet.has(event)) continue
+      selectedSet.add(event)
+      selected.push(event)
+      if (selected.length >= max) return
+    }
+  }
+
+  add(focusedCombat, Math.min(48, max))
+  add(critical, Math.min(60, Math.max(0, max - selected.length)))
+  add(carePackages, Math.min(12, Math.max(0, max - selected.length)))
+  add(
+    events.filter((event) => !selectedSet.has(event)),
+    Math.max(0, max - selected.length)
+  )
 
   return selected.sort((left, right) => {
     if (left.elapsedSeconds === undefined) return 1
@@ -826,6 +850,7 @@ function compactTimeline(events: TelemetryEvent[], max: number) {
 function downsample<T>(items: T[], max: number): T[] {
   if (max <= 0) return []
   if (items.length <= max) return items
+  if (max === 1) return [items[Math.floor(items.length / 2)]!]
   const step = (items.length - 1) / (max - 1)
   return Array.from(
     { length: max },

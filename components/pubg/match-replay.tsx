@@ -3,6 +3,7 @@
 import * as React from "react"
 import {
   ActivityIcon,
+  ArrowLeftIcon,
   ArrowRightIcon,
   CrosshairIcon,
   Maximize2Icon,
@@ -101,6 +102,26 @@ const statusColors: Record<ReplayPlayerStatus, string> = {
   alive: "var(--chart-2)",
   knocked: "var(--chart-3)",
   dead: "var(--muted-foreground)",
+}
+
+const eventTypeLabels: Record<string, string> = {
+  LogPlayerAttack: "开火",
+  LogPlayerCreate: "玩家创建",
+  LogPlayerDeath: "死亡",
+  LogPlayerKill: "淘汰",
+  LogPlayerKillV2: "淘汰",
+  LogPlayerLogin: "玩家加入",
+  LogPlayerMakeGroggy: "击倒",
+  LogPlayerRevive: "救起",
+  LogPlayerTakeDamage: "受到伤害",
+  LogCarePackageLand: "补给箱落地",
+  LogCarePackageSpawn: "补给箱生成",
+  LogVehicleLeave: "离开载具",
+  LogVehicleRide: "乘上载具",
+}
+
+function formatEventType(type: string) {
+  return eventTypeLabels[type] ?? type.replace(/^LogPlayer/, "玩家")
 }
 
 function formatTime(seconds: number) {
@@ -324,19 +345,37 @@ function ReplayMap({
   const selectedIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === selectedPlayerId
   )
-  const selectedPlayer = analysis.replayPlayers[selectedIndex]
-  const selectedPath =
-    selectedPlayerId === analysis.playerId && path
-      ? path
-      : analysis.replayFrames
-          .flatMap((frame) => {
-            const player = frame.players.find(
-              ([playerIndex]) => playerIndex === selectedIndex
-            )
-            return player ? [`${player[1]},${player[2]}`] : []
-          })
-          .join(" ")
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
+  const selectedPlayer = analysis.replayPlayers[selectedIndex]
+  const selectedPath = React.useMemo(() => {
+    const framePath = analysis.replayFrames.flatMap((frame) => {
+      if (frame.elapsedSeconds > visibleTime) return []
+      const player = frame.players.find(
+        ([playerIndex]) => playerIndex === selectedIndex
+      )
+      return player ? [`${player[1]},${player[2]}`] : []
+    })
+    const currentPlayer = currentFrame?.players.find(
+      ([playerIndex]) => playerIndex === selectedIndex
+    )
+    if (currentPlayer) {
+      const currentPoint = `${currentPlayer[1]},${currentPlayer[2]}`
+      if (framePath.at(-1) !== currentPoint) framePath.push(currentPoint)
+    }
+    if (framePath.length > 0) return framePath.join(" ")
+    return analysis.replayFrames.length === 0 &&
+      selectedPlayerId === analysis.playerId
+      ? path
+      : ""
+  }, [
+    analysis.playerId,
+    analysis.replayFrames,
+    currentFrame,
+    path,
+    selectedIndex,
+    selectedPlayerId,
+    visibleTime,
+  ])
   const visibleKills = analysis.timeline.filter(
     (kill) =>
       kill.type.includes("Kill") &&
@@ -814,22 +853,38 @@ function Roster({
   const indexById = new Map(
     analysis.replayPlayers.map((player, index) => [player.id, index])
   )
+  const replayPlayersById = new Map(
+    analysis.replayPlayers.map((player) => [player.id, player])
+  )
   const participantsById = new Map(
     match.participants.map((participant) => [participant.id, participant])
   )
-  const visiblePlayers = analysis.replayPlayers
-    .map((player) => ({
-      player,
-      participant: participantsById.get(player.id),
-    }))
-    .sort((left, right) => {
-      if (left.player.id === analysis.playerId) return -1
-      if (right.player.id === analysis.playerId) return 1
-      return (left.participant?.rank ?? 999) - (right.participant?.rank ?? 999)
-    })
-  const targetTeamId = analysis.replayPlayers.find(
-    (player) => player.id === analysis.playerId
-  )?.teamId
+  const visiblePlayers = [
+    ...match.participants.map((participant) => ({
+      participant,
+      player: {
+        ...(replayPlayersById.get(participant.id) ?? {}),
+        id: participant.id,
+        name: replayPlayersById.get(participant.id)?.name ?? participant.name,
+        ...(replayPlayersById.get(participant.id)?.teamId !== undefined
+          ? { teamId: replayPlayersById.get(participant.id)?.teamId }
+          : participant.teamId !== undefined
+            ? { teamId: participant.teamId }
+            : {}),
+      },
+    })),
+    ...analysis.replayPlayers
+      .filter((player) => !participantsById.has(player.id))
+      .map((player) => ({ player, participant: undefined })),
+  ].sort((left, right) => {
+    if (left.player.id === analysis.playerId) return -1
+    if (right.player.id === analysis.playerId) return 1
+    return (left.participant?.rank ?? 999) - (right.participant?.rank ?? 999)
+  })
+  const targetTeamId = visiblePlayers.find(
+    ({ player }) => player.id === analysis.playerId
+  )?.player.teamId
+  const totalPlayers = Math.max(match.participantCount, visiblePlayers.length)
 
   return (
     <div className="rounded-xl border bg-card">
@@ -837,7 +892,7 @@ function Roster({
         <div>
           <h3 className="text-sm font-semibold">参赛者</h3>
           <p className="text-xs text-muted-foreground">
-            {analysis.replayPlayers.length} 名玩家有可识别位置
+            {analysis.replayPlayers.length} / {totalPlayers} 名玩家有可识别位置
           </p>
         </div>
         <UsersIcon className="size-4 text-muted-foreground" />
@@ -892,9 +947,11 @@ function Roster({
                 <span className="text-xs text-muted-foreground">
                   {state
                     ? statusLabels[state[3]]
-                    : participant?.rank
-                      ? `第 ${participant.rank} 名`
-                      : "无位置"}
+                    : playerIndex !== undefined
+                      ? "等待定位"
+                      : participant?.rank
+                        ? `第 ${participant.rank} 名`
+                        : "无位置数据"}
                 </span>
               </Button>
             )
@@ -952,6 +1009,9 @@ function ReplayTimeline({
   const nextEvent = filteredEvents.find(
     (event) => (event.elapsedSeconds ?? 0) > currentTime + 0.05
   )
+  const previousEvent = [...filteredEvents]
+    .reverse()
+    .find((event) => (event.elapsedSeconds ?? 0) < currentTime - 0.05)
 
   return (
     <>
@@ -978,6 +1038,15 @@ function ReplayTimeline({
               <ToggleGroupItem value="combat">战斗</ToggleGroupItem>
               <ToggleGroupItem value="state">状态</ToggleGroupItem>
             </ToggleGroup>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!previousEvent}
+              onClick={() => onSeek(previousEvent?.elapsedSeconds ?? 0)}
+            >
+              <ArrowLeftIcon data-icon="inline-start" />
+              上一事件
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -1018,7 +1087,7 @@ function ReplayTimeline({
                   >
                     {event.type === "LogPlayerAttack"
                       ? "开火"
-                      : event.type.replace("LogPlayer", "")}
+                      : formatEventType(event.type)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {event.message}
@@ -1062,7 +1131,7 @@ function ReplayTimeline({
                           : "outline"
                       }
                     >
-                      {selectedEvent.type}
+                      {formatEventType(selectedEvent.type)}
                     </Badge>
                   </dd>
                 </div>
