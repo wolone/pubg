@@ -425,6 +425,70 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toBe("TestPlayer 受到 12.3 点伤害")
   })
 
+  it("keeps downed-state damage neutral when telemetry repeats the victim", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          _D: "2026-09-12T10:01:00Z",
+          damage: 0,
+          damageTypeCategory: "Damage_DBNO",
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+          },
+          victim: {
+            accountId: "account.123",
+            name: "TestPlayer",
+          },
+        },
+      ],
+      "account.123",
+      "match-dbno"
+    )
+
+    expect(analysis.timeline[0]?.message).toBe("TestPlayer 处于倒地状态")
+  })
+
+  it("does not describe zero damage as effective damage", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          _D: "2026-09-12T10:01:00Z",
+          damage: 0,
+          damageTypeCategory: "Damage_Gun",
+          attacker: { accountId: "account.123", name: "TestPlayer" },
+          victim: { accountId: "account.456", name: "Opponent" },
+        },
+      ],
+      "account.123",
+      "match-zero-damage"
+    )
+
+    expect(analysis.timeline[0]?.message).toBe(
+      "TestPlayer 对 Opponent 未造成有效伤害"
+    )
+  })
+
+  it("does not claim that an incomplete kill event is a self-elimination", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerKill",
+          _D: "2026-09-12T10:01:00Z",
+          killer: { accountId: "account.123", name: "TestPlayer" },
+          victim: { accountId: "account.123", name: "TestPlayer" },
+        },
+      ],
+      "account.other",
+      "match-self-kill"
+    )
+
+    expect(analysis.timeline[0]?.message).toBe("TestPlayer 被淘汰")
+    expect(analysis.kills).toHaveLength(0)
+  })
+
   it("does not expose the transport aircraft as a player vehicle", () => {
     const analysis = parseTelemetry(
       [

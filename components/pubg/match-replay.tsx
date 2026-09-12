@@ -120,8 +120,23 @@ const eventTypeLabels: Record<string, string> = {
   LogVehicleRide: "乘上载具",
 }
 
+const damageTypeLabels: Record<string, string> = {
+  Damage_BlueZone: "蓝区",
+  Damage_BlueZoneGrenade: "蓝区手雷",
+  Damage_DBNO: "倒地状态",
+  Damage_Explosion_Grenade: "爆炸物",
+  Damage_Gun: "枪械",
+  Damage_InstantFall: "坠落",
+  Damage_Melee: "近战",
+  Damage_VehicleCrash: "载具碰撞",
+}
+
 function formatEventType(type: string) {
   return eventTypeLabels[type] ?? type.replace(/^LogPlayer/, "玩家")
+}
+
+function formatDamageType(type: string) {
+  return damageTypeLabels[type] ?? type.replace(/^Damage_/, "")
 }
 
 function formatTime(seconds: number) {
@@ -1180,7 +1195,9 @@ function ReplayTimeline({
                 {selectedEvent.damageType ? (
                   <div className="flex flex-col gap-1">
                     <dt className="text-xs text-muted-foreground">伤害类型</dt>
-                    <dd className="text-sm">{selectedEvent.damageType}</dd>
+                    <dd className="text-sm">
+                      {formatDamageType(selectedEvent.damageType)}
+                    </dd>
                   </div>
                 ) : null}
                 <div className="flex flex-col gap-1">

@@ -462,13 +462,17 @@ export function parseTelemetry(
         type,
         actor ? (replayPlayersById.get(actor)?.name ?? actor) : null,
         target ? (replayPlayersById.get(target)?.name ?? target) : null,
-        damage
+        damage,
+        damageType
       ),
     })
   }
 
   const kills = timeline.filter(
-    (event) => event.type.includes("Kill") && event.actor === playerId
+    (event) =>
+      event.type.includes("Kill") &&
+      event.actor === playerId &&
+      event.target !== playerId
   )
   const replayPlayerIds = Array.from(replayPlayersById.keys())
     .sort((left, right) => {
@@ -780,17 +784,35 @@ function timelineMessage(
   type: string,
   actor: string | null,
   target: string | null,
-  damage?: number
+  damage?: number,
+  damageType?: string
 ) {
-  if (type.includes("Kill"))
+  if (type.includes("Kill")) {
+    if (actor && target && actor === target) return `${target} 被淘汰`
     return `${actor ?? "玩家"} 淘汰了 ${target ?? "对手"}`
+  }
   if (type.includes("Damage")) {
+    if (damageType === "Damage_DBNO" && target) {
+      return `${target} 处于倒地状态`
+    }
     if (damage === undefined) {
       return target && !actor
         ? `${target} 受到了一次伤害`
         : `${actor ?? "玩家"} 造成了一次伤害`
     }
-    if (!actor && target) return `${target} 受到 ${formatDamage(damage)} 点伤害`
+    if (!actor && target) {
+      return damage === 0
+        ? `${target} 未受到有效伤害`
+        : `${target} 受到 ${formatDamage(damage)} 点伤害`
+    }
+    if (actor && target && actor === target) {
+      return damage === 0
+        ? `${target} 未受到有效伤害`
+        : `${target} 受到 ${formatDamage(damage)} 点伤害`
+    }
+    if (damage === 0) {
+      return `${actor ?? "玩家"} 对 ${target ?? "目标"} 未造成有效伤害`
+    }
     return `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${formatDamage(damage)} 点伤害`
   }
   if (type === "LogPlayerAttack") return `${actor ?? "玩家"} 开火`
