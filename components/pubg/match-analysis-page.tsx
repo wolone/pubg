@@ -19,7 +19,6 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty"
-import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
@@ -29,7 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { TrajectoryCard } from "@/components/pubg/trajectory-card"
+import { MatchReplay } from "@/components/pubg/match-replay"
+import { SiteHeader } from "@/components/site-header"
 import type {
   ApiError,
   MatchAnalysis,
@@ -112,13 +112,14 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
   }, [matchId, platform, playerId])
 
   return (
-    <div className="min-h-svh bg-muted/20 p-4 lg:p-8">
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+    <div className="min-h-svh bg-muted/20">
+      <SiteHeader title="比赛回放" active="replay" />
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-6">
         <Button variant="ghost" className="w-fit" render={<Link href="/" />}>
-          <ArrowLeftIcon data-icon="inline-start" /> 返回战绩概览
+          <ArrowLeftIcon data-icon="inline-start" /> 返回战绩查询
         </Button>
         <div>
-          <p className="text-sm text-muted-foreground">比赛分析</p>
+          <p className="text-sm text-muted-foreground">比赛回放</p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">
             {match?.mapName ?? "比赛详情"}
           </h1>
@@ -135,7 +136,7 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
         {error ? (
           <Alert variant="destructive">
             <CrosshairIcon />
-            <AlertTitle>比赛分析不可用</AlertTitle>
+            <AlertTitle>比赛回放不可用</AlertTitle>
             <AlertDescription>{error.message}</AlertDescription>
           </Alert>
         ) : null}
@@ -185,10 +186,10 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
                 </CardContent>
               </Card>
             </div>
-            <TrajectoryCard analysis={analysis} />
+            <MatchReplay key={match.id} match={match} analysis={analysis} />
             <Card>
               <CardHeader>
-                <CardTitle>参赛者</CardTitle>
+                <CardTitle>参赛者成绩</CardTitle>
               </CardHeader>
               <CardContent>
                 {match.participants.length ? (
@@ -232,58 +233,13 @@ export function MatchAnalysisPage({ matchId }: { matchId: string }) {
                 )}
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>事件时间线</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {analysis.timeline.length ? (
-                  <div className="space-y-0">
-                    {analysis.timeline.map((event, index) => (
-                      <React.Fragment
-                        key={`${event.type}-${event.timestamp}-${index}`}
-                      >
-                        <div className="flex gap-3 py-3">
-                          <Badge
-                            variant={
-                              event.type.includes("Kill")
-                                ? "default"
-                                : "outline"
-                            }
-                          >
-                            {event.type.replace("LogPlayer", "")}
-                          </Badge>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm">{event.message}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {event.timestamp
-                                ? new Date(event.timestamp).toLocaleTimeString(
-                                    "zh-CN"
-                                  )
-                                : "未知时间"}
-                            </p>
-                          </div>
-                        </div>
-                        {index < analysis.timeline.length - 1 ? (
-                          <Separator />
-                        ) : null}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="py-8 text-center text-sm text-muted-foreground">
-                    没有可展示的事件。
-                  </p>
-                )}
-              </CardContent>
-            </Card>
           </>
         ) : null}
         {!loading && !error && !playerId ? (
           <Alert>
             <AlertTitle>缺少目标玩家</AlertTitle>
             <AlertDescription>
-              请从战绩概览中的近期比赛进入分析页面。
+              请从战绩查询中的近期比赛进入回放页面。
             </AlertDescription>
           </Alert>
         ) : null}

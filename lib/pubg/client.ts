@@ -161,7 +161,10 @@ export async function getMatchAnalysis(
     )
   }
   const telemetry = (await telemetryResponse.json()) as unknown
-  return { ...parseTelemetry(telemetry, playerId, matchId), source: "api" }
+  return {
+    ...parseTelemetry(telemetry, playerId, matchId, match.participants),
+    source: "api",
+  }
 }
 
 export function getCurrentSeason(seasons: SeasonSummary[]) {

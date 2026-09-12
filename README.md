@@ -1,13 +1,14 @@
 # PUBG Insight
 
-基于 Next.js 16、React 19、TypeScript、Tailwind CSS 4 和 shadcn/ui 的 PUBG 官方战绩查询与比赛分析应用。
+基于 Next.js 16、React 19、TypeScript、Tailwind CSS 4 和 shadcn/ui 的 PUBG 官方战绩查询与比赛回放应用。
 
 ## 功能
 
 - 按 Steam、Kakao、PlayStation、Xbox 平台查询玩家。
 - 查看当前或指定赛季、指定模式的击杀、胜场、伤害、KDA 和趋势图。
 - 查看最近比赛的地图、模式、排名、击杀和遥测可用性。
-- 延迟加载比赛参赛者、击杀时间线和降采样移动轨迹。
+- 战绩查询与比赛回放分为两个模块：战绩页负责玩家/赛季/近期比赛，比赛页提供地图视图、时间轴、播放控制、参赛者状态和击杀标记。
+- 延迟加载比赛参赛者、击杀时间线和压缩后的回放时间帧。
 - 使用 Cloudflare D1 保存规范化快照和缓存，不保存无限期原始遥测。
 
 ## 本地开发
@@ -56,7 +57,7 @@ pnpm deploy:vinext
 | `GET /api/players?platform=steam&name=playerName` | 玩家与最近比赛 |
 | `GET /api/players/:playerId/stats?platform=steam&season=current&gameMode=squad` | 赛季模式统计 |
 | `GET /api/matches/:matchId?platform=steam` | 比赛详情与参赛者 |
-| `GET /api/matches/:matchId/telemetry?platform=steam&playerId=...` | 遥测解析、事件和轨迹 |
+| `GET /api/matches/:matchId/telemetry?platform=steam&playerId=...` | 遥测解析、回放时间帧、事件和轨迹 |
 
 ## 验证
 

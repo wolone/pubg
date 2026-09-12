@@ -41,7 +41,7 @@ export function MatchTable({
       <CardHeader>
         <CardTitle>近期比赛</CardTitle>
         <CardDescription>
-          点击一场比赛查看参赛者、事件时间线与移动轨迹。
+          选择一场比赛进入独立回放，按时间查看移动轨迹与事件。
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -100,7 +100,7 @@ export function MatchTable({
                         />
                       }
                     >
-                      查看 <ArrowUpRightIcon data-icon="inline-end" />
+                      进入回放 <ArrowUpRightIcon data-icon="inline-end" />
                     </Button>
                   </TableCell>
                 </TableRow>

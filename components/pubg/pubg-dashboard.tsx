@@ -201,7 +201,7 @@ export function PubgDashboard() {
                   搜索你的 PUBG 战绩
                 </CardTitle>
                 <CardDescription className="max-w-xl text-center text-base">
-                  输入玩家名称，查看赛季表现、近期比赛与比赛分析。
+                  输入玩家名称，查看赛季表现与近期比赛；选择比赛进入回放。
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-5 px-6 pb-10 sm:pb-14">

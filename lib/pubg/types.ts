@@ -73,10 +73,43 @@ export interface MatchSummary {
 export interface TelemetryEvent {
   type: string
   timestamp: string | null
+  elapsedSeconds?: number
   actor: string | null
   target: string | null
   location: { x: number; y: number; z?: number } | null
   message: string
+}
+
+export type ReplayPlayerStatus = "alive" | "knocked" | "dead"
+
+export interface ReplayPlayer {
+  id: string
+  name: string
+}
+
+export interface ReplayZone {
+  x: number
+  y: number
+  radius: number
+}
+
+export interface ReplayZones {
+  bluezone: ReplayZone | null
+  safezone: ReplayZone | null
+  redzone: ReplayZone | null
+}
+
+export type ReplayFramePlayer = [
+  playerIndex: number,
+  x: number,
+  y: number,
+  status: ReplayPlayerStatus,
+]
+
+export interface ReplayFrame {
+  elapsedSeconds: number
+  players: ReplayFramePlayer[]
+  zones?: ReplayZones
 }
 
 export interface MatchAnalysis {
@@ -85,6 +118,9 @@ export interface MatchAnalysis {
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
+  replayPlayers: ReplayPlayer[]
+  replayFrames: ReplayFrame[]
+  replayDurationSeconds: number
   source: "api" | "cache"
 }
 

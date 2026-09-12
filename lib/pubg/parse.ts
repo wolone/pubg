@@ -3,6 +3,10 @@ import type {
   MatchParticipant,
   MatchSummary,
   Platform,
+  ReplayFrame,
+  ReplayPlayer,
+  ReplayPlayerStatus,
+  ReplayZones,
   SeasonStats,
   SeasonSummary,
   TelemetryEvent,
@@ -211,19 +215,43 @@ function telemetryCharacter(event: Record<string, unknown>, key: string) {
 export function parseTelemetry(
   raw: unknown,
   playerId: string,
-  matchId: string
+  matchId: string,
+  participants: MatchParticipant[] = []
 ): {
   matchId: string
   playerId: string
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
+  replayPlayers: ReplayPlayer[]
+  replayFrames: ReplayFrame[]
+  replayDurationSeconds: number
 } {
   const events = Array.isArray(raw) ? raw : []
   const timeline: TelemetryEvent[] = []
   const trajectory: Array<{ x: number; y: number; z?: number }> = []
+  const replayChanges: ReplayChange[] = []
+  const replayPlayersById = new Map<string, ReplayPlayer>()
+  const positionCounts = new Map<string, number>()
+  const participantIdsByName = new Map(
+    participants.map((participant) => [participant.name, participant.id])
+  )
+  const eventTimes = events
+    .filter((item): item is Record<string, unknown> =>
+      Boolean(item && typeof item === "object")
+    )
+    .map((event) => timestampOf(event))
+    .filter((value): value is number => value !== null)
+  const replayStartMs = eventTimes.length ? Math.min(...eventTimes) : null
 
-  for (const item of events) {
+  for (const participant of participants) {
+    replayPlayersById.set(participant.id, {
+      id: participant.id,
+      name: participant.name,
+    })
+  }
+
+  for (const [eventIndex, item] of events.entries()) {
     if (!item || typeof item !== "object") continue
     const event = item as Record<string, unknown>
     const type = stringValue(
@@ -237,14 +265,111 @@ export function parseTelemetry(
       telemetryCharacter(event, "killer")
     const victim = telemetryCharacter(event, "victim")
     const character = telemetryCharacter(event, "character")
-    const actor =
-      stringValue(attacker?.accountId, stringValue(character?.accountId, "")) ||
-      null
-    const target = stringValue(victim?.accountId, "") || null
     const location =
       locationOf(character?.location) ??
       locationOf(attacker?.location) ??
       locationOf(event.location)
+    const elapsedSeconds = elapsedTimeOf(event, replayStartMs, eventIndex)
+    const characterName = stringValue(character?.name, "")
+    const attackerName = stringValue(attacker?.name, "")
+    const victimName = stringValue(victim?.name, "")
+    const characterId =
+      stringValue(character?.accountId, "") ||
+      participantIdsByName.get(characterName) ||
+      null
+    const actor =
+      stringValue(attacker?.accountId, "") ||
+      participantIdsByName.get(attackerName) ||
+      characterId
+    const target =
+      stringValue(victim?.accountId, "") ||
+      participantIdsByName.get(victimName) ||
+      null
+    const replayZones = parseReplayZones(event)
+
+    if (characterId) {
+      registerReplayPlayer(
+        replayPlayersById,
+        characterId,
+        characterName || characterId
+      )
+    }
+    if (actor) {
+      registerReplayPlayer(replayPlayersById, actor, attackerName || actor)
+    }
+    if (target) {
+      registerReplayPlayer(replayPlayersById, target, victimName || target)
+    }
+
+    if (replayZones) {
+      replayChanges.push({ elapsedSeconds, zones: replayZones })
+    }
+
+    if (location && (characterId || actor)) {
+      const replayPlayerId = characterId ?? actor
+      if (replayPlayerId) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: replayPlayerId,
+          location,
+        })
+        positionCounts.set(
+          replayPlayerId,
+          (positionCounts.get(replayPlayerId) ?? 0) + 1
+        )
+      }
+    }
+
+    const victimLocation = locationOf(victim?.location)
+    if (target && victimLocation) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: target,
+        location: victimLocation,
+      })
+      positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
+    }
+
+    if (type.includes("Kill")) {
+      if (target) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: target,
+          status: "dead",
+          location: victimLocation,
+        })
+        if (victimLocation) {
+          positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
+        }
+      }
+    } else if (type.includes("Death")) {
+      const deadPlayerId = target ?? actor
+      if (deadPlayerId) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: deadPlayerId,
+          status: "dead",
+        })
+      }
+    } else if (/groggy|knock/i.test(type)) {
+      const knockedPlayerId = target ?? characterId
+      if (knockedPlayerId) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: knockedPlayerId,
+          status: "knocked",
+        })
+      }
+    } else if (/revive|rescue/i.test(type)) {
+      const revivedPlayerId = target ?? characterId
+      if (revivedPlayerId) {
+        replayChanges.push({
+          elapsedSeconds,
+          playerId: revivedPlayerId,
+          status: "alive",
+        })
+      }
+    }
 
     if (
       actor === playerId &&
@@ -258,6 +383,7 @@ export function parseTelemetry(
       type.includes("Kill") ||
       type.includes("Damage") ||
       type.includes("Death") ||
+      /groggy|knock|revive|rescue/i.test(type) ||
       type === "LogPlayerPosition" ||
       type === "LogPlayerLogin" ||
       type === "LogPlayerCreate"
@@ -266,6 +392,7 @@ export function parseTelemetry(
     timeline.push({
       type,
       timestamp,
+      elapsedSeconds,
       actor,
       target,
       location,
@@ -276,6 +403,18 @@ export function parseTelemetry(
   const kills = timeline.filter(
     (event) => event.type.includes("Kill") && event.actor === playerId
   )
+  const replayPlayerIds = Array.from(replayPlayersById.keys())
+    .sort((left, right) => {
+      if (left === playerId) return -1
+      if (right === playerId) return 1
+      return (positionCounts.get(right) ?? 0) - (positionCounts.get(left) ?? 0)
+    })
+    .filter((id) => id === playerId || (positionCounts.get(id) ?? 0) > 0)
+    .slice(0, 64)
+  const replayPlayers = replayPlayerIds
+    .map((id) => replayPlayersById.get(id))
+    .filter((player): player is ReplayPlayer => Boolean(player))
+  const replay = buildReplay(replayChanges, replayPlayerIds)
 
   return {
     matchId,
@@ -285,7 +424,140 @@ export function parseTelemetry(
       .filter((event) => event.type !== "LogPlayerPosition")
       .slice(-120),
     trajectory: downsample(trajectory, 240),
+    replayPlayers,
+    replayFrames: replay.frames,
+    replayDurationSeconds: replay.durationSeconds,
   }
+}
+
+type ReplayChange = {
+  elapsedSeconds: number
+  playerId?: string
+  location?: { x: number; y: number; z?: number } | null
+  status?: ReplayPlayerStatus
+  zones?: ReplayZones
+}
+
+type ReplayState = {
+  x: number
+  y: number
+  status: ReplayPlayerStatus
+}
+
+function timestampOf(event: Record<string, unknown>): number | null {
+  const timestamp = stringValue(event._D, stringValue(event.timestamp, ""))
+  const parsed = timestamp ? Date.parse(timestamp) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function elapsedTimeOf(
+  event: Record<string, unknown>,
+  startMs: number | null,
+  fallbackIndex: number
+) {
+  const timestamp = timestampOf(event)
+  if (timestamp === null || startMs === null) return fallbackIndex / 10
+  return Math.max(0, (timestamp - startMs) / 1000)
+}
+
+function registerReplayPlayer(
+  players: Map<string, ReplayPlayer>,
+  id: string,
+  name: string
+) {
+  if (!players.has(id)) players.set(id, { id, name })
+}
+
+function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
+  const value = event.gameState
+  if (!value || typeof value !== "object") return null
+  const gameState = value as Record<string, unknown>
+  const bluezone = replayZoneOf(
+    gameState.safetyZonePosition,
+    gameState.safetyZoneRadius
+  )
+  const safezone = replayZoneOf(
+    gameState.poisonGasWarningPosition,
+    gameState.poisonGasWarningRadius
+  )
+  const redzone = replayZoneOf(
+    gameState.redZonePosition,
+    gameState.redZoneRadius
+  )
+  if (!bluezone && !safezone && !redzone) return null
+  return { bluezone, safezone, redzone }
+}
+
+function replayZoneOf(position: unknown, radius: unknown) {
+  const location = locationOf(position)
+  const size = numberValue(radius, Number.NaN)
+  if (!location || !Number.isFinite(size) || size <= 0) return null
+  return { x: location.x, y: location.y, radius: size }
+}
+
+function buildReplay(changes: ReplayChange[], playerIds: string[]) {
+  if (changes.length === 0) {
+    return { frames: [] as ReplayFrame[], durationSeconds: 0 }
+  }
+
+  const sortedChanges = changes
+    .filter((change) => !change.playerId || playerIds.includes(change.playerId))
+    .sort((left, right) => left.elapsedSeconds - right.elapsedSeconds)
+  const durationSeconds = Math.max(0, sortedChanges.at(-1)?.elapsedSeconds ?? 0)
+  const stepSeconds = Math.max(1, Math.ceil(durationSeconds / 600))
+  const playerIndexById = new Map(playerIds.map((id, index) => [id, index]))
+  const states = new Map<string, ReplayState>()
+  const frames: ReplayFrame[] = []
+  let zones: ReplayZones | undefined
+  let changeIndex = 0
+
+  for (
+    let elapsedSeconds = 0;
+    elapsedSeconds <= durationSeconds;
+    elapsedSeconds += stepSeconds
+  ) {
+    while (
+      changeIndex < sortedChanges.length &&
+      sortedChanges[changeIndex]!.elapsedSeconds <= elapsedSeconds
+    ) {
+      const change = sortedChanges[changeIndex]!
+      if (change.zones) zones = change.zones
+      if (change.playerId) {
+        const previous = states.get(change.playerId)
+        if (change.location) {
+          states.set(change.playerId, {
+            x: change.location.x,
+            y: change.location.y,
+            status: change.status ?? previous?.status ?? "alive",
+          })
+        } else if (previous && change.status) {
+          states.set(change.playerId, { ...previous, status: change.status })
+        }
+      }
+      changeIndex += 1
+    }
+
+    const framePlayers = Array.from(states.entries())
+      .map(([id, state]) => {
+        const playerIndex = playerIndexById.get(id)
+        return playerIndex === undefined
+          ? null
+          : ([playerIndex, state.x, state.y, state.status] as const)
+      })
+      .filter((player): player is ReplayFrame["players"][number] =>
+        Boolean(player)
+      )
+    if (framePlayers.length || zones) {
+      const frame: ReplayFrame = {
+        elapsedSeconds: Math.round(elapsedSeconds * 10) / 10,
+        players: framePlayers,
+      }
+      if (zones) frame.zones = zones
+      frames.push(frame)
+    }
+  }
+
+  return { frames, durationSeconds }
 }
 
 function timelineMessage(
@@ -296,6 +568,8 @@ function timelineMessage(
   if (type.includes("Kill"))
     return `${actor ?? "玩家"} 淘汰了 ${target ?? "对手"}`
   if (type.includes("Damage")) return `${actor ?? "玩家"} 造成了一次伤害`
+  if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
+  if (/revive|rescue/i.test(type)) return `${target ?? actor ?? "玩家"} 被救起`
   if (type.includes("Death")) return `${target ?? actor ?? "玩家"} 被淘汰`
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
