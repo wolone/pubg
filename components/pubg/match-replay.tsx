@@ -139,6 +139,14 @@ function formatDamageType(type: string) {
   return damageTypeLabels[type] ?? type.replace(/^Damage_/, "")
 }
 
+function formatTimelineEventType(event: MatchAnalysis["timeline"][number]) {
+  if (event.type === "LogPlayerAttack") return "开火"
+  if (event.type.includes("Damage") && event.damageType) {
+    return formatDamageType(event.damageType)
+  }
+  return formatEventType(event.type)
+}
+
 function formatTime(seconds: number) {
   const totalSeconds = Math.max(0, Math.floor(seconds))
   const minutes = Math.floor(totalSeconds / 60)
@@ -1108,9 +1116,7 @@ function ReplayTimeline({
                       event.type.includes("Kill") ? "default" : "outline"
                     }
                   >
-                    {event.type === "LogPlayerAttack"
-                      ? "开火"
-                      : formatEventType(event.type)}
+                    {formatTimelineEventType(event)}
                   </Badge>
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {event.message}
@@ -1280,7 +1286,7 @@ function ReplayHud({
               ? "官方遥测"
               : reliableAlivePlayers !== undefined
                 ? "根据完整位置帧估算"
-                : "官方遥测未提供存活数"
+                : "等待官方存活数据"
         }
         icon={UsersIcon}
       />
