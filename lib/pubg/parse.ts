@@ -31,6 +31,16 @@ const numberValue = (value: unknown, fallback = 0) =>
 const stringValue = (value: unknown, fallback = "") =>
   typeof value === "string" && value.length > 0 ? value : fallback
 
+function seasonDisplayName(id: string): string {
+  const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
+  if (numberedSeason) return `第 ${Number(numberedSeason)} 赛季`
+
+  const yearSeason = id.match(/(\d{4})-(\d+)$/)
+  if (yearSeason) return `${yearSeason[1]} 第 ${Number(yearSeason[2])} 赛季`
+
+  return id
+}
+
 export function relationshipIds(
   resource: JsonApiResource | undefined,
   name: string
@@ -74,9 +84,13 @@ export function parseSeasons(
 
   return resources.map((resource) => {
     const attributes = resource.attributes ?? {}
+    const attributeName = stringValue(attributes.name)
     return {
       id: resource.id,
-      displayName: stringValue(attributes.name, resource.id),
+      displayName:
+        attributeName && !attributeName.startsWith("division.")
+          ? attributeName
+          : seasonDisplayName(resource.id),
       isCurrent:
         Boolean(attributes.isCurrentSeason) || resource.id === currentSeasonId,
     }

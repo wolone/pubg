@@ -55,6 +55,23 @@ describe("PUBG JSON:API parser", () => {
     expect(stats.winRate).toBe(0.2)
   })
 
+  it("creates readable labels for legacy PUBG season ids", () => {
+    const seasons = parseSeasons({
+      data: [
+        {
+          type: "season",
+          id: "division.bro.official.pc-2018-43",
+          attributes: {},
+        },
+      ],
+    })
+
+    expect(seasons[0]).toMatchObject({
+      id: "division.bro.official.pc-2018-43",
+      displayName: "第 43 赛季",
+    })
+  })
+
   it("normalizes match participants and telemetry analysis", () => {
     const match = parseMatchDocument(matchDocument, "steam", "account.123")
     expect(match).toMatchObject({

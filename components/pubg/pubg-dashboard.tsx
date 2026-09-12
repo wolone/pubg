@@ -21,8 +21,15 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { MatchTable } from "@/components/pubg/match-table"
 import { PlayerSearch } from "@/components/pubg/player-search"
@@ -147,6 +154,10 @@ export function PubgDashboard() {
     }
   }, [gameMode, loadStats, name, platform])
 
+  const activeSeasonName =
+    seasons.find((season) => season.id === stats?.seasonId)?.displayName ??
+    stats?.seasonId
+
   return (
     <SidebarProvider
       style={
@@ -212,11 +223,11 @@ export function PubgDashboard() {
                         ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        赛季 {stats.seasonId} · {stats.gameMode}
+                        赛季 {activeSeasonName} · {stats.gameMode}
                       </p>
                     </div>
                     <div className="flex flex-col items-start gap-2 sm:items-end">
-                      <Tabs
+                      <Select
                         value={stats.seasonId}
                         onValueChange={(value) => {
                           if (value) {
@@ -228,14 +239,22 @@ export function PubgDashboard() {
                           }
                         }}
                       >
-                        <TabsList>
-                          {seasons.slice(0, 5).map((season) => (
-                            <TabsTrigger key={season.id} value={season.id}>
-                              {season.displayName}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                      </Tabs>
+                        <SelectTrigger
+                          aria-label="选择赛季"
+                          className="w-full sm:w-52"
+                        >
+                          <SelectValue placeholder="选择赛季" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {seasons.slice(0, 5).map((season) => (
+                              <SelectItem key={season.id} value={season.id}>
+                                {season.displayName}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
                       <ToggleGroup
                         multiple={false}
                         value={[gameMode]}
