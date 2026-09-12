@@ -150,6 +150,10 @@ function formatEventLocation(
   return coordinates.map((value) => Math.round(value)).join(", ")
 }
 
+function formatDamage(damage: number) {
+  return String(Math.round(damage * 10) / 10)
+}
+
 function interpolateZone(
   left: ReplayZone | null | undefined,
   right: ReplayZone | null | undefined,
@@ -1164,7 +1168,9 @@ function ReplayTimeline({
                 {selectedEvent.damage !== undefined ? (
                   <div className="flex flex-col gap-1">
                     <dt className="text-xs text-muted-foreground">伤害</dt>
-                    <dd className="text-sm">{selectedEvent.damage} 点</dd>
+                    <dd className="text-sm">
+                      {formatDamage(selectedEvent.damage)} 点
+                    </dd>
                   </div>
                 ) : null}
                 {selectedEvent.damageType ? (

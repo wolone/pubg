@@ -404,6 +404,40 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toContain("34.5 点伤害")
   })
 
+  it("does not expose the transport aircraft as a player vehicle", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 200, y: 300 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 250, y: 350 },
+          },
+          vehicle: { vehicleType: "Dacia" },
+        },
+      ],
+      "account.123",
+      "match-transport-aircraft"
+    )
+
+    expect(analysis.replayFrames[0]?.vehicles).toBeUndefined()
+    expect(analysis.replayFrames.at(-1)?.vehicles).toEqual([
+      { playerIndex: 0, vehicleType: "Dacia" },
+    ])
+  })
+
   it("preserves key events when the timeline needs compacting", () => {
     const analysis = parseTelemetry(
       [

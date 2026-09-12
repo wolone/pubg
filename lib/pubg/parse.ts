@@ -585,10 +585,11 @@ function optionalInteger(value: unknown) {
 
 function vehicleTypeOf(vehicle: Record<string, unknown> | undefined) {
   if (!vehicle) return undefined
-  return (
+  const vehicleType =
     stringValue(vehicle.vehicleType, stringValue(vehicle.vehicleId, "")) ||
     undefined
-  )
+  if (!vehicleType || /transportaircraft/i.test(vehicleType)) return undefined
+  return vehicleType
 }
 
 function replayPhaseOf(event: Record<string, unknown>) {
@@ -786,7 +787,7 @@ function timelineMessage(
   if (type.includes("Damage")) {
     return damage === undefined
       ? `${actor ?? "玩家"} 造成了一次伤害`
-      : `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${damage} 点伤害`
+      : `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${formatDamage(damage)} 点伤害`
   }
   if (type === "LogPlayerAttack") return `${actor ?? "玩家"} 开火`
   if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
@@ -800,6 +801,10 @@ function timelineMessage(
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
   return type
+}
+
+function formatDamage(damage: number) {
+  return String(Math.round(damage * 10) / 10)
 }
 
 function compactTimeline(

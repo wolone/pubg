@@ -37,23 +37,17 @@ import type {
   Platform,
 } from "@/lib/pubg/types"
 
-export function MatchAnalysisPage({ matchId }: { matchId: string }) {
-  const [{ platform, playerId }] = React.useState(() => {
-    if (typeof window === "undefined")
-      return { platform: "steam" as Platform, playerId: "" }
-    const params = new URLSearchParams(window.location.search)
-    const nextPlatform = params.get("platform")
-    return {
-      platform:
-        nextPlatform === "steam" ||
-        nextPlatform === "kakao" ||
-        nextPlatform === "psn" ||
-        nextPlatform === "xbox"
-          ? nextPlatform
-          : ("steam" as Platform),
-      playerId: params.get("playerId") ?? "",
-    }
-  })
+export function MatchAnalysisPage({
+  matchId,
+  initialPlatform,
+  initialPlayerId,
+}: {
+  matchId: string
+  initialPlatform: Platform
+  initialPlayerId: string
+}) {
+  const platform = initialPlatform
+  const playerId = initialPlayerId
   const [match, setMatch] = React.useState<MatchSummary | null>(null)
   const [analysis, setAnalysis] = React.useState<MatchAnalysis | null>(null)
   const [error, setError] = React.useState<ApiError["error"] | null>(null)
