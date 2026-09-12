@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -38,46 +39,55 @@ export function PlayerSearch({
 }) {
   return (
     <form
-      className="flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-xs sm:flex-row sm:items-end"
+      className="flex w-full max-w-3xl flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault()
         onSubmit()
       }}
     >
-      <div className="grid flex-1 gap-2">
-        <Label htmlFor="player-name">玩家名称</Label>
-        <Input
-          id="player-name"
-          placeholder="输入 PUBG 游戏名，例如 Shroud"
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          autoComplete="off"
-        />
-      </div>
-      <div className="grid gap-2 sm:w-44">
-        <Label htmlFor="platform">平台</Label>
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
         <Select
           value={platform}
-          onValueChange={(value) =>
-            value && onPlatformChange(value as Platform)
-          }
+          onValueChange={(value) => {
+            if (value) onPlatformChange(value as Platform)
+          }}
         >
-          <SelectTrigger id="platform" className="w-full">
+          <SelectTrigger aria-label="选择平台" className="!h-11 w-full sm:w-36">
             <SelectValue placeholder="选择平台" />
           </SelectTrigger>
           <SelectContent>
-            {platforms.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              {platforms.map((item) => (
+                <SelectItem key={item.value} value={item.value}>
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
+        <div className="grid min-w-0 flex-1 gap-2">
+          <Label className="sr-only" htmlFor="player-name">
+            玩家名称
+          </Label>
+          <Input
+            id="player-name"
+            className="h-11 bg-background px-4 text-base"
+            placeholder="请输入绝地求生用户名"
+            value={name}
+            onChange={(event) => onNameChange(event.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={loading}
+          size="lg"
+          className="h-11 sm:px-8"
+        >
+          <SearchIcon data-icon="inline-start" />
+          {loading ? "查询中…" : "搜索玩家"}
+        </Button>
       </div>
-      <Button type="submit" disabled={loading} className="sm:w-28">
-        <SearchIcon data-icon="inline-start" />
-        {loading ? "查询中…" : "查询战绩"}
-      </Button>
     </form>
   )
 }

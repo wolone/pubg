@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import {
   ActivityIcon,
   CrosshairIcon,
@@ -9,10 +10,16 @@ import {
   TrophyIcon,
 } from "lucide-react"
 
-import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import {
   Empty,
   EmptyDescription,
@@ -29,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { MatchTable } from "@/components/pubg/match-table"
 import { PlayerSearch } from "@/components/pubg/player-search"
@@ -44,6 +50,13 @@ import type {
   SeasonSummary,
   SeasonStats,
 } from "@/lib/pubg/types"
+
+const platforms: Array<{ value: Platform; label: string }> = [
+  { value: "steam", label: "Steam" },
+  { value: "kakao", label: "Kakao" },
+  { value: "psn", label: "PlayStation" },
+  { value: "xbox", label: "Xbox" },
+]
 
 const modes: Array<{ value: GameMode; label: string }> = [
   { value: "solo", label: "单排" },
@@ -159,183 +172,201 @@ export function PubgDashboard() {
     stats?.seasonId
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 64)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
-    >
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <main className="flex flex-1 flex-col bg-muted/20">
-          <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
-            <section id="overview" className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    PUBG 战绩查询
-                  </h2>
-                  <Badge variant="outline">官方 API</Badge>
+    <div className="min-h-svh bg-muted/20">
+      <SiteHeader />
+      <main className="flex min-h-[calc(100svh-3rem)] flex-col">
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 lg:p-6">
+          <section id="overview" className="flex flex-col gap-4">
+            <Card className="overflow-hidden">
+              <CardHeader className="w-full items-center justify-items-center gap-3 px-6 pt-10 text-center sm:pt-14">
+                <div className="flex h-10 items-center">
+                  <Image
+                    src="/assets/pubg-logo-black.png"
+                    alt="PLAYERUNKNOWN'S BATTLEGROUNDS"
+                    width={220}
+                    height={60}
+                    priority
+                    className="h-10 w-auto object-contain dark:hidden"
+                  />
+                  <Image
+                    src="/assets/pubg-logo-white.png"
+                    alt="PLAYERUNKNOWN'S BATTLEGROUNDS"
+                    width={220}
+                    height={60}
+                    priority
+                    className="hidden h-10 w-auto object-contain dark:block"
+                  />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  输入玩家名称，查看赛季表现并复盘最近比赛。
-                </p>
-              </div>
-              <PlayerSearch
-                name={name}
-                platform={platform}
-                loading={loading}
-                onNameChange={setName}
-                onPlatformChange={setPlatform}
-                onSubmit={() => void query()}
-              />
-            </section>
-
-            {error ? (
-              <Alert variant="destructive">
-                <ActivityIcon />
-                <AlertTitle>查询未完成</AlertTitle>
-                <AlertDescription>{error.message}</AlertDescription>
-              </Alert>
-            ) : null}
-
-            {loading ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <Skeleton key={index} className="h-28 rounded-xl" />
-                ))}
-              </div>
-            ) : player && stats ? (
-              <>
-                <section className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-semibold">{player.name}</h3>
-                        <Badge variant="secondary">
-                          {platform.toUpperCase()}
-                        </Badge>
-                        {stats.source === "cache" ? (
-                          <Badge variant="outline">D1 缓存</Badge>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        赛季 {activeSeasonName} · {stats.gameMode}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-start gap-2 sm:items-end">
-                      <Select
-                        value={stats.seasonId}
-                        onValueChange={(value) => {
-                          if (value) {
-                            setError(null)
-                            setLoading(true)
-                            void loadStats(player.id, gameMode, value).finally(
-                              () => setLoading(false)
-                            )
-                          }
-                        }}
-                      >
-                        <SelectTrigger
-                          aria-label="选择赛季"
-                          className="w-full sm:w-52"
-                        >
-                          <SelectValue placeholder="选择赛季" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            {seasons.slice(0, 5).map((season) => (
-                              <SelectItem key={season.id} value={season.id}>
-                                {season.displayName}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                      <ToggleGroup
-                        multiple={false}
-                        value={[gameMode]}
-                        onValueChange={(value) => {
-                          if (value[0]) {
-                            setError(null)
-                            setLoading(true)
-                            setGameMode(value[0] as GameMode)
-                            void loadStats(
-                              player.id,
-                              value[0] as GameMode,
-                              stats.seasonId
-                            ).finally(() => setLoading(false))
-                          }
-                        }}
-                        variant="outline"
-                        size="sm"
-                        className="flex-wrap justify-start"
-                      >
-                        {modes.map((mode) => (
-                          <ToggleGroupItem key={mode.value} value={mode.value}>
-                            {mode.label}
-                          </ToggleGroupItem>
-                        ))}
-                      </ToggleGroup>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard
-                      label="胜场"
-                      value={stats.wins.toLocaleString()}
-                      detail={`胜率 ${(stats.winRate * 100).toFixed(1)}%`}
-                      icon={TrophyIcon}
-                    />
-                    <StatCard
-                      label="击杀"
-                      value={stats.kills.toLocaleString()}
-                      detail={`K/D ${stats.deaths ? (stats.kills / stats.deaths).toFixed(2) : "∞"}`}
-                      icon={CrosshairIcon}
-                    />
-                    <StatCard
-                      label="场均伤害"
-                      value={
-                        stats.rounds
-                          ? (stats.damage / stats.rounds).toFixed(0)
-                          : "0"
-                      }
-                      detail={`总伤害 ${stats.damage.toLocaleString()}`}
-                      icon={ActivityIcon}
-                    />
-                    <StatCard
-                      label="KDA"
-                      value={stats.kda.toFixed(2)}
-                      detail={`${stats.assists.toLocaleString()} 次助攻`}
-                      icon={ShieldCheckIcon}
-                    />
-                  </div>
-                </section>
-                <StatsChart stats={stats} />
-                <MatchTable
-                  matches={matches}
+                <CardTitle className="max-w-2xl text-center text-3xl tracking-tight sm:text-4xl">
+                  搜索你的 PUBG 战绩
+                </CardTitle>
+                <CardDescription className="max-w-xl text-center text-base">
+                  输入玩家名称，查看赛季表现、近期比赛与比赛分析。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-5 px-6 pb-10 sm:pb-14">
+                <PlayerSearch
+                  name={name}
                   platform={platform}
-                  playerId={player.id}
+                  loading={loading}
+                  onNameChange={setName}
+                  onPlatformChange={setPlatform}
+                  onSubmit={() => void query()}
                 />
-              </>
-            ) : (
-              <Empty className="min-h-[360px] border bg-card">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Gamepad2Icon className="size-5" />
-                  </EmptyMedia>
-                  <EmptyTitle>准备开始查询</EmptyTitle>
-                  <EmptyDescription>
-                    选择平台并输入玩家名称，开始读取 PUBG 官方战绩。
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            )}
-          </div>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+                <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <span>支持平台</span>
+                  {platforms.map((item) => (
+                    <Badge key={item.value} variant="secondary">
+                      {item.label}
+                    </Badge>
+                  ))}
+                  <span>· 官方数据 · 无需登录</span>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+
+          {error ? (
+            <Alert variant="destructive">
+              <ActivityIcon />
+              <AlertTitle>查询未完成</AlertTitle>
+              <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }, (_, index) => (
+                <Skeleton key={index} className="h-28 rounded-xl" />
+              ))}
+            </div>
+          ) : player && stats ? (
+            <>
+              <section className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold">{player.name}</h3>
+                      <Badge variant="secondary">
+                        {platform.toUpperCase()}
+                      </Badge>
+                      {stats.source === "cache" ? (
+                        <Badge variant="outline">D1 缓存</Badge>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      赛季 {activeSeasonName} · {stats.gameMode}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <Select
+                      value={stats.seasonId}
+                      onValueChange={(value) => {
+                        if (value) {
+                          setError(null)
+                          setLoading(true)
+                          void loadStats(player.id, gameMode, value).finally(
+                            () => setLoading(false)
+                          )
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        aria-label="选择赛季"
+                        className="w-full sm:w-52"
+                      >
+                        <SelectValue placeholder="选择赛季" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {seasons.slice(0, 5).map((season) => (
+                            <SelectItem key={season.id} value={season.id}>
+                              {season.displayName}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <ToggleGroup
+                      multiple={false}
+                      value={[gameMode]}
+                      onValueChange={(value) => {
+                        if (value[0]) {
+                          setError(null)
+                          setLoading(true)
+                          setGameMode(value[0] as GameMode)
+                          void loadStats(
+                            player.id,
+                            value[0] as GameMode,
+                            stats.seasonId
+                          ).finally(() => setLoading(false))
+                        }
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="flex-wrap justify-start"
+                    >
+                      {modes.map((mode) => (
+                        <ToggleGroupItem key={mode.value} value={mode.value}>
+                          {mode.label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <StatCard
+                    label="胜场"
+                    value={stats.wins.toLocaleString()}
+                    detail={`胜率 ${(stats.winRate * 100).toFixed(1)}%`}
+                    icon={TrophyIcon}
+                  />
+                  <StatCard
+                    label="击杀"
+                    value={stats.kills.toLocaleString()}
+                    detail={`K/D ${stats.deaths ? (stats.kills / stats.deaths).toFixed(2) : "∞"}`}
+                    icon={CrosshairIcon}
+                  />
+                  <StatCard
+                    label="场均伤害"
+                    value={
+                      stats.rounds
+                        ? (stats.damage / stats.rounds).toFixed(0)
+                        : "0"
+                    }
+                    detail={`总伤害 ${stats.damage.toLocaleString()}`}
+                    icon={ActivityIcon}
+                  />
+                  <StatCard
+                    label="KDA"
+                    value={stats.kda.toFixed(2)}
+                    detail={`${stats.assists.toLocaleString()} 次助攻`}
+                    icon={ShieldCheckIcon}
+                  />
+                </div>
+              </section>
+              <StatsChart stats={stats} />
+              <MatchTable
+                matches={matches}
+                platform={platform}
+                playerId={player.id}
+              />
+            </>
+          ) : (
+            <Empty className="min-h-[360px] border bg-card">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Gamepad2Icon className="size-5" />
+                </EmptyMedia>
+                <EmptyTitle>准备开始查询</EmptyTitle>
+                <EmptyDescription>
+                  选择平台并输入玩家名称，开始读取 PUBG 官方战绩。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </div>
+      </main>
+    </div>
   )
 }
