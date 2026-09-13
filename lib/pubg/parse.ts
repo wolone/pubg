@@ -497,7 +497,6 @@ export function parseTelemetry(
     if (replayPlayerId) {
       const isReplayLocation =
         location &&
-        !isFlightPosition &&
         (type === "LogPlayerPosition" || !isPlayerAirborne)
       if (isReplayLocation) {
         replayChanges.push({

@@ -1397,4 +1397,51 @@ describe("PUBG JSON:API parser", () => {
         ?.players[0]?.[3]
     ).toBe("alive")
   })
+
+  it("keeps aircraft positions in replay frames without adding the aircraft point to the trajectory", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogMatchStart",
+          elapsedTime: 0,
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 100, y: 200, z: 150000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 300, y: 400, z: 30000 },
+          },
+        },
+      ],
+      "account.123",
+      "match-aircraft"
+    )
+
+    expect(
+      analysis.replayFrames
+        .find((frame) => frame.elapsedSeconds === 10)
+        ?.players[0]?.slice(0, 4)
+    ).toEqual([0, 100, 200, "alive"])
+    expect(analysis.replayFrames.at(-1)?.players[0]?.slice(0, 4)).toEqual([
+      0,
+      300,
+      400,
+      "alive",
+    ])
+    expect(analysis.trajectory).toEqual([
+      { x: 300, y: 400, z: 30000, elapsedSeconds: 20 },
+    ])
+  })
 })
