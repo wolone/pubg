@@ -379,7 +379,7 @@ export function parseTelemetry(
 
     const replayPlayerId = characterId ?? actor
     if (replayPlayerId) {
-      if (location) {
+      if (location && !isFlightPosition) {
         replayChanges.push({
           elapsedSeconds,
           playerId: replayPlayerId,
@@ -457,6 +457,7 @@ export function parseTelemetry(
     if (
       actor === playerId &&
       location &&
+      !isFlightPosition &&
       (type === "LogPlayerPosition" || type === "LogPlayerAttack")
     ) {
       trajectory.push(location)

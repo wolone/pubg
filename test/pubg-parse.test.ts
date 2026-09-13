@@ -558,7 +558,11 @@ describe("PUBG JSON:API parser", () => {
       "match-transport-aircraft"
     )
 
-    expect(analysis.replayFrames[0]?.vehicles).toBeUndefined()
+    expect(
+      analysis.replayFrames
+        .flatMap((frame) => frame.vehicles ?? [])
+        .some((vehicle) => /transportaircraft/i.test(vehicle.vehicleType))
+    ).toBe(false)
     expect(analysis.replayFrames.at(-1)?.vehicles).toEqual([
       { playerIndex: 0, vehicleType: "Dacia" },
     ])
@@ -680,6 +684,53 @@ describe("PUBG JSON:API parser", () => {
       { x: 100, y: 200, z: 150000 },
       { x: 200, y: 300, z: 150000 },
       { x: 300, y: 400, z: 150000 },
+    ])
+  })
+
+  it("keeps transport aircraft positions out of the player trajectory", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200, z: 150000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            location: { x: 200, y: 300, z: 150000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          character: {
+            accountId: "account.123",
+            location: { x: 300, y: 400, z: 1200 },
+          },
+        },
+      ],
+      "account.123",
+      "match-trajectory-after-flight"
+    )
+
+    expect(analysis.flightPath).toEqual([
+      { x: 100, y: 200, z: 150000 },
+      { x: 200, y: 300, z: 150000 },
+    ])
+    expect(analysis.trajectory).toEqual([{ x: 300, y: 400, z: 1200 }])
+    expect(analysis.replayFrames.at(-1)?.players[0]).toEqual([
+      0,
+      300,
+      400,
+      "alive",
     ])
   })
 
