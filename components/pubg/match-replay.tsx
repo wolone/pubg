@@ -2155,6 +2155,9 @@ export function MatchReplay({
   )
   const hasReplayFrames = analysis.replayFrames.length > 0
   const hasStaticTrajectory = analysis.trajectory.length > 0
+  const hasTimelineData =
+    analysis.timeline.length > 0 ||
+    analysis.replayFrames.some((frame) => Boolean(frame.zones))
   const [currentTime, setCurrentTime] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
   const [speed, setSpeed] = React.useState<number>(1)
@@ -2516,7 +2519,7 @@ export function MatchReplay({
             </p>
           </div>
         )}
-        {analysis.timeline.length ? (
+        {hasTimelineData ? (
           <ReplayTimeline
             events={analysis.timeline}
             currentTime={currentTime}
