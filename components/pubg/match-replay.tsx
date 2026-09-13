@@ -420,13 +420,16 @@ function ReplayMap({
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
   const trackedPlayer = analysis.replayPlayers[targetIndex]
   const trackedPath = React.useMemo(() => {
-    const framePath = analysis.replayFrames.flatMap((frame) => {
-      if (frame.elapsedSeconds > visibleTime) return []
+    const framePath: string[] = []
+    for (const frame of analysis.replayFrames) {
+      if (frame.elapsedSeconds > visibleTime) continue
       const player = frame.players.find(
         ([playerIndex]) => playerIndex === targetIndex
       )
-      return player ? [`${player[1]},${player[2]}`] : []
-    })
+      if (!player) continue
+      const point = `${player[1]},${player[2]}`
+      if (framePath.at(-1) !== point) framePath.push(point)
+    }
     const currentPlayer = currentFrame?.players.find(
       ([playerIndex]) => playerIndex === targetIndex
     )
