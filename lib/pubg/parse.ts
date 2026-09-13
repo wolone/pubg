@@ -377,6 +377,7 @@ export function parseTelemetry(
       stringValue(victim?.accountId, "") ||
       participantIdsByName.get(victimName) ||
       null
+    const victimLocation = locationOf(victim?.location)
     const health = optionalPercentageNumber(
       character?.health ?? attacker?.health
     )
@@ -537,7 +538,6 @@ export function parseTelemetry(
       }
     }
 
-    const victimLocation = locationOf(victim?.location)
     if (target && victimLocation) {
       replayChanges.push({
         elapsedSeconds,
@@ -580,6 +580,15 @@ export function parseTelemetry(
         elapsedSeconds,
         playerId: target,
         healthDelta: -damage,
+      })
+    }
+    if (damageType === "Damage_DBNO" && target) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: target,
+        status: "knocked",
+        ...(victimLocation ? { location: victimLocation } : {}),
+        framePriority: "critical",
       })
     }
     if (type === "LogHeal" && characterId && healAmount !== undefined) {
@@ -641,8 +650,7 @@ export function parseTelemetry(
       actor === playerId &&
       location &&
       !isFlightPosition &&
-      (type === "LogPlayerPosition" || type === "LogPlayerAttack") &&
-      (type !== "LogPlayerAttack" || !isPlayerAirborne)
+      type === "LogPlayerPosition"
     ) {
       trajectory.push({ ...location, elapsedSeconds })
     }

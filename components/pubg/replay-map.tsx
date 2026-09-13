@@ -25,7 +25,10 @@ type MapPoint = { x: number; y: number; z?: number }
 type MapBounds = { minX: number; minY: number; width: number; height: number }
 type MapPan = { x: number; y: number }
 
-const MAP_IMAGE_SIZE = 819
+// Keep the SVG coordinate space at the native size of the bundled map assets.
+// Scaling a 4096px image down to 819 user units before applying the zoom
+// transform makes high-magnification replay views noticeably blurry.
+const MAP_IMAGE_SIZE = 4096
 const MAP_ZOOM_MIN = 1
 const MAP_ZOOM_MAX = 50
 const MAP_ZOOM_FACTOR = 1.2
@@ -1044,7 +1047,7 @@ export function ReplayMap({
             const label =
               player.teamId === undefined ? "?" : String(player.teamId)
             const labelSize = markerRadius(
-              isTarget || isSelected ? 10 : 8,
+              (isTarget || isSelected ? 10 : 8) * markerScale,
               mapScale,
               viewportSize,
               model

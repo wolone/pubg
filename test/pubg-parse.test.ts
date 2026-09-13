@@ -679,6 +679,40 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toBe("TestPlayer 处于倒地状态")
   })
 
+  it("marks Damage_DBNO as knocked in replay state", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          elapsedTime: 4,
+          damage: 0,
+          damageTypeCategory: "Damage_DBNO",
+          attacker: {
+            accountId: "account.attacker",
+            name: "Attacker",
+            location: { x: 100, y: 100 },
+          },
+          victim: {
+            accountId: "account.victim",
+            name: "Victim",
+            health: 0,
+            location: { x: 200, y: 200 },
+          },
+        },
+      ],
+      "account.attacker",
+      "match-dbno-status"
+    )
+
+    expect(analysis.replayFrames.at(-1)?.players).toContainEqual([
+      1,
+      200,
+      200,
+      "knocked",
+      0,
+    ])
+  })
+
   it("does not describe zero damage as effective damage", () => {
     const analysis = parseTelemetry(
       [
@@ -1248,9 +1282,7 @@ describe("PUBG JSON:API parser", () => {
       location: { x: 200, y: 300 },
       message: "TestPlayer 开火",
     })
-    expect(analysis.trajectory).toEqual([
-      { x: 200, y: 300, elapsedSeconds: 18 },
-    ])
+    expect(analysis.trajectory).toEqual([])
   })
 
   it("tracks vehicle state without retaining raw vehicle telemetry", () => {
