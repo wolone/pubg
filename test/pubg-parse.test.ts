@@ -1416,6 +1416,14 @@ describe("PUBG JSON:API parser", () => {
           vehicle: { vehicleType: "TransportAircraft" },
         },
         {
+          _T: "LogItemUnequip",
+          elapsedTime: 11,
+          character: {
+            accountId: "account.123",
+            location: { x: 900, y: 1000, z: 2000 },
+          },
+        },
+        {
           _T: "LogPlayerPosition",
           elapsedTime: 20,
           character: {
@@ -1432,6 +1440,11 @@ describe("PUBG JSON:API parser", () => {
     expect(
       analysis.replayFrames
         .find((frame) => frame.elapsedSeconds === 10)
+        ?.players[0]?.slice(0, 4)
+    ).toEqual([0, 100, 200, "alive"])
+    expect(
+      analysis.replayFrames
+        .find((frame) => frame.elapsedSeconds === 11)
         ?.players[0]?.slice(0, 4)
     ).toEqual([0, 100, 200, "alive"])
     expect(analysis.replayFrames.at(-1)?.players[0]?.slice(0, 4)).toEqual([

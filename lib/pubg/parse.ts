@@ -495,8 +495,17 @@ export function parseTelemetry(
 
     const replayPlayerId = characterId ?? actor
     if (replayPlayerId) {
+      const isReplayLocationEvent =
+        type === "LogPlayerPosition" ||
+        type === "LogPlayerAttack" ||
+        type.includes("Damage") ||
+        type.includes("Kill") ||
+        type.includes("Death") ||
+        type.includes("Vehicle") ||
+        /groggy|knock|revive|rescue/i.test(type)
       const isReplayLocation =
         location &&
+        isReplayLocationEvent &&
         (type === "LogPlayerPosition" || !isPlayerAirborne)
       if (isReplayLocation) {
         replayChanges.push({
