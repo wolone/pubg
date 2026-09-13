@@ -6,6 +6,7 @@ import type {
   ReplayFrame,
   ReplayFramePlayer,
   ReplayFrameVehicle,
+  ReplayCarePackageEvent,
   ReplayPlayer,
   ReplayPlayerStatus,
   ReplayZones,
@@ -264,6 +265,7 @@ export function parseTelemetry(
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
   flightPath: Array<{ x: number; y: number; z?: number }>
+  carePackages: ReplayCarePackageEvent[]
   replayPlayers: ReplayPlayer[]
   replayFrames: ReplayFrame[]
   replayDurationSeconds: number
@@ -271,6 +273,7 @@ export function parseTelemetry(
   const events = Array.isArray(raw) ? raw : []
   const timeline: TelemetryEvent[] = []
   const trajectory: Array<{ x: number; y: number; z?: number }> = []
+  const carePackages: ReplayCarePackageEvent[] = []
   const flightPathBuckets = new Map<
     number,
     { x: number; y: number; z: number; count: number }
@@ -353,6 +356,24 @@ export function parseTelemetry(
     const items = type.includes("CarePackage")
       ? carePackageItems(itemPackage)
       : undefined
+    const packageState =
+      type === "LogCarePackageSpawn"
+        ? "spawned"
+        : type === "LogCarePackageLand"
+          ? "landed"
+          : undefined
+    const packageLocation = locationOf(itemPackage?.location)
+    if (packageState && packageLocation) {
+      const packageType = stringValue(itemPackage?.itemPackageId, "")
+      carePackages.push({
+        key: eventIndex,
+        state: packageState,
+        elapsedSeconds,
+        location: packageLocation,
+        ...(packageType ? { packageType } : {}),
+        ...(items ? { items } : {}),
+      })
+    }
     const phase = replayPhaseOf(event)
     const vehicleType = vehicleTypeOf(vehicle)
     const isFlightPosition =
@@ -638,6 +659,7 @@ export function parseTelemetry(
     ),
     trajectory: downsample(trajectory, 240),
     flightPath: downsample(buildFlightPath(flightPathBuckets), 96),
+    carePackages,
     replayPlayers,
     replayFrames: replay.frames,
     replayDurationSeconds: replay.durationSeconds,

@@ -11,6 +11,7 @@ import type {
   ReplayFrame,
   ReplayFramePlayer,
   ReplayPlayerStatus,
+  ReplayCarePackageEvent,
   ReplayZone,
 } from "@/lib/pubg/types"
 
@@ -128,6 +129,55 @@ function healthColor(value: number) {
 
 function currentStates(frame: ReplayFrame | null) {
   return new Map(frame?.players.map((player) => [player[0], player]) ?? [])
+}
+
+export function activeCarePackagesAtTime(
+  events: ReplayCarePackageEvent[],
+  currentTime: number
+) {
+  const active: ReplayCarePackageEvent[] = []
+  const orderedEvents = [...events]
+    .filter((event) => event.elapsedSeconds <= currentTime)
+    .sort(
+      (left, right) =>
+        left.elapsedSeconds - right.elapsedSeconds || left.key - right.key
+    )
+
+  for (const event of orderedEvents) {
+    if (/Uaz_Armored_C/i.test(event.packageType ?? "")) continue
+    if (event.state === "spawned") {
+      active.push(event)
+      continue
+    }
+
+    let matchIndex = -1
+    let closestDistance = Number.POSITIVE_INFINITY
+    for (const [index, candidate] of active.entries()) {
+      if (candidate.state !== "spawned") continue
+      const distance = Math.hypot(
+        candidate.location.x - event.location.x,
+        candidate.location.y - event.location.y
+      )
+      if (distance < closestDistance) {
+        closestDistance = distance
+        matchIndex = index
+      }
+    }
+
+    if (matchIndex >= 0) {
+      const spawned = active[matchIndex]!
+      active[matchIndex] = {
+        ...spawned,
+        state: "landed",
+        location: event.location,
+        ...(event.items ? { items: event.items } : {}),
+      }
+    } else {
+      active.push(event)
+    }
+  }
+
+  return active
 }
 
 function pointsFromAnalysis(analysis: MatchAnalysis) {
@@ -530,12 +580,32 @@ export function ReplayMap({
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
   )
-  const visibleCarePackages = analysis.timeline.filter(
+  const visibleCarePackageEvents = analysis.timeline.filter(
     (event) =>
       event.type.includes("CarePackage") &&
       event.location &&
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
+  )
+  const carePackageEvents = analysis.carePackages?.length
+    ? analysis.carePackages
+    : visibleCarePackageEvents.flatMap((event, index) => {
+        if (!event.location || event.elapsedSeconds === undefined) return []
+        const state =
+          event.type === "LogCarePackageSpawn" ? "spawned" : "landed"
+        return [
+          {
+            key: index,
+            state,
+            elapsedSeconds: event.elapsedSeconds,
+            location: event.location,
+            ...(event.items ? { items: event.items } : {}),
+          } satisfies ReplayCarePackageEvent,
+        ]
+      })
+  const activeCarePackages = activeCarePackagesAtTime(
+    carePackageEvents,
+    visibleTime
   )
   const activeTracers = analysis.timeline.filter(
     (event) =>
@@ -551,7 +621,9 @@ export function ReplayMap({
     ...(visibleTimelineLayers.includes("kills") ? visibleKills : []),
     ...(visibleTimelineLayers.includes("damage") ? visibleDamage : []),
     ...(visibleTimelineLayers.includes("attacks") ? visibleAttacks : []),
-    ...(visibleTimelineLayers.includes("state") ? visibleCarePackages : []),
+    ...(visibleTimelineLayers.includes("state")
+      ? visibleCarePackageEvents
+      : []),
   ]
   const visiblePlayers = Array.from(states.entries())
     .map(([playerIndex, state]) => ({
@@ -887,16 +959,17 @@ export function ReplayMap({
               })
             : null}
           {showEvents && visibleTimelineLayers.includes("state")
-            ? visibleCarePackages.map((event, index) => {
-                if (!event.location) return null
-                const point = model.projectPoint(event.location)
-                const isFlying = event.type.includes("Spawn")
+            ? activeCarePackages.map((carePackage) => {
+                const point = model.projectPoint(carePackage.location)
+                const isFlying = carePackage.state === "spawned"
                 const width = screenToMap(18)
                 const height = screenToMap(isFlying ? 32 : 17)
                 const anchorOffset = screenToMap(isFlying ? 23 : 8)
                 return (
-                  <g key={`care-package-${event.timestamp}-${index}`}>
-                    <title>{event.message}</title>
+                  <g key={`care-package-${carePackage.key}`}>
+                    <title>
+                      {isFlying ? "补给箱下降中" : "补给箱已落地"}
+                    </title>
                     <image
                       href={
                         isFlying

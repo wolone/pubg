@@ -11,7 +11,7 @@ import type {
 
 const CACHE_TTL_MS = 15 * 60 * 1000
 const MATCH_TTL_MS = 14 * 24 * 60 * 60 * 1000
-const REPLAY_PARSER_VERSION = 22
+const REPLAY_PARSER_VERSION = 23
 
 type StatsRow = {
   platform: Platform
@@ -50,6 +50,7 @@ type AnalysisRow = {
   kills_json: string
   trajectory_json: string
   flight_path_json?: string
+  care_packages_json?: string
   timeline_json: string
   replay_players_json?: string
   replay_frames_json?: string
@@ -329,6 +330,10 @@ export class StatsRepository {
         row.flight_path_json ?? "[]",
         []
       ),
+      carePackages: json<MatchAnalysis["carePackages"]>(
+        row.care_packages_json ?? "[]",
+        []
+      ),
       replayPlayers: json<MatchAnalysis["replayPlayers"]>(
         row.replay_players_json ?? "[]",
         []
@@ -355,12 +360,13 @@ export class StatsRepository {
       .prepare(
         `INSERT INTO player_match_analysis
          (platform, player_id, match_id, kills_json, trajectory_json, timeline_json,
-          flight_path_json, replay_players_json, replay_frames_json, replay_duration_seconds, parser_version,
+          flight_path_json, care_packages_json, replay_players_json, replay_frames_json, replay_duration_seconds, parser_version,
           generated_at, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(platform, player_id, match_id) DO UPDATE SET
            kills_json = excluded.kills_json, trajectory_json = excluded.trajectory_json,
            flight_path_json = excluded.flight_path_json,
+           care_packages_json = excluded.care_packages_json,
            timeline_json = excluded.timeline_json, replay_players_json = excluded.replay_players_json,
            replay_frames_json = excluded.replay_frames_json,
            replay_duration_seconds = excluded.replay_duration_seconds,
@@ -375,6 +381,7 @@ export class StatsRepository {
         JSON.stringify(analysis.trajectory),
         JSON.stringify(analysis.timeline),
         JSON.stringify(analysis.flightPath),
+        JSON.stringify(analysis.carePackages),
         JSON.stringify(analysis.replayPlayers),
         JSON.stringify(analysis.replayFrames),
         analysis.replayDurationSeconds,

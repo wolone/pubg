@@ -110,6 +110,15 @@ export interface ReplayZone {
   radius: number
 }
 
+export interface ReplayCarePackageEvent {
+  key: number
+  state: "spawned" | "landed"
+  elapsedSeconds: number
+  location: TelemetryLocation
+  packageType?: string
+  items?: TelemetryItem[]
+}
+
 export interface ReplayZones {
   bluezone: ReplayZone | null
   safezone: ReplayZone | null
@@ -149,6 +158,7 @@ export interface MatchAnalysis {
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
   flightPath: Array<{ x: number; y: number; z?: number }>
+  carePackages: ReplayCarePackageEvent[]
   replayPlayers: ReplayPlayer[]
   replayFrames: ReplayFrame[]
   replayDurationSeconds: number

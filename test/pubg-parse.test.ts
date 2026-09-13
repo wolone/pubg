@@ -587,6 +587,20 @@ describe("PUBG JSON:API parser", () => {
       { itemId: "Item_Ammo_762mm_C", stackCount: 15 },
     ])
     expect(analysis.timeline[1]?.message).toBe("补给箱已落地")
+    expect(analysis.carePackages).toMatchObject([
+      {
+        key: 0,
+        state: "spawned",
+        elapsedSeconds: 0,
+        location: { x: 300, y: 400, z: 20 },
+      },
+      {
+        key: 1,
+        state: "landed",
+        elapsedSeconds: 60,
+        location: { x: 320, y: 420, z: 20 },
+      },
+    ])
   })
 
   it("keeps damage amount and category for combat analysis", () => {
