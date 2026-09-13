@@ -390,10 +390,14 @@ function extendRayToBounds(
     }
   }
 
-  if (direction.x > 0) addCandidate((maxX - point.x) / direction.x)
-  if (direction.x < 0) addCandidate((bounds.minX - point.x) / direction.x)
-  if (direction.y > 0) addCandidate((maxY - point.y) / direction.y)
-  if (direction.y < 0) addCandidate((bounds.minY - point.y) / direction.y)
+  if (direction.x !== 0) {
+    addCandidate((maxX - point.x) / direction.x)
+    addCandidate((bounds.minX - point.x) / direction.x)
+  }
+  if (direction.y !== 0) {
+    addCandidate((maxY - point.y) / direction.y)
+    addCandidate((bounds.minY - point.y) / direction.y)
+  }
 
   const distance = Math.min(...candidates)
   if (!Number.isFinite(distance)) {
