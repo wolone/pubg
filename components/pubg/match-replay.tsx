@@ -1131,9 +1131,9 @@ function Roster({
             含 {telemetryOnlyCount} 名仅在官方遥测中识别的玩家
           </p>
         ) : null}
-        {currentFrame?.alivePlayers !== undefined ? (
+        {analysis.replayFrames.length ? (
           <p className="text-xs text-muted-foreground">
-            官方存活人数以回放统计卡为准；列表状态表示各玩家最后一次遥测状态。
+            列表状态表示各玩家最后一次遥测状态；官方存活人数以统计卡为准。
           </p>
         ) : null}
         <Input
