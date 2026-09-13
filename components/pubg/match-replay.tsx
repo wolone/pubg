@@ -468,7 +468,19 @@ function clipFlightPathToBounds(
   points: ReplayMapPoint[],
   bounds: ReplayMapBounds
 ) {
-  if (points.length < 2) return points
+  if (points.length === 0) return []
+  if (points.length === 1) {
+    const [point] = points
+    const maxX = bounds.minX + bounds.width
+    const maxY = bounds.minY + bounds.height
+    return point &&
+      point.x >= bounds.minX &&
+      point.x <= maxX &&
+      point.y >= bounds.minY &&
+      point.y <= maxY
+      ? [point]
+      : []
+  }
   const first = points[0]!
   const second = points[1]!
   const last = points.at(-1)!
@@ -826,10 +838,10 @@ function ReplayMap({
             strokeOpacity="0.2"
             strokeWidth={Math.max(bounds.width / 816000, 1)}
           />
-          {showFlightPath && analysis.flightPath.length > 0 ? (
+          {showFlightPath && flightPathPoints.length > 0 ? (
             <g>
               <title>起始航线</title>
-              {analysis.flightPath.length > 1 ? (
+              {flightPathPoints.length > 1 ? (
                 <polyline
                   points={extendedFlightPath}
                   fill="none"
@@ -853,7 +865,7 @@ function ReplayMap({
                 strokeWidth={Math.max(bounds.width / 500000, 2)}
                 vectorEffect="non-scaling-stroke"
               />
-              {analysis.flightPath.length > 1 ? (
+              {flightPathPoints.length > 1 ? (
                 <circle
                   cx={flightPathPoints.at(-1)!.x}
                   cy={flightPathPoints.at(-1)!.y}
@@ -1184,9 +1196,9 @@ function ReplayMap({
               跟踪：{trackedPlayer.name}
             </Badge>
           ) : null}
-          {analysis.flightPath.length > 0 ? (
+          {flightPathPoints.length > 0 ? (
             <Badge variant="outline" className="bg-background/85">
-              航线 {analysis.flightPath.length} 点
+              航线 {flightPathPoints.length} 点
             </Badge>
           ) : null}
           {trackedPathPointCount > 0 ? (
@@ -1231,7 +1243,7 @@ function ReplayMap({
         </ToggleGroup>
       </div>
       <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-        {analysis.flightPath.length > 0 ? (
+        {flightPathPoints.length > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
             <span className="h-0 w-4 border-t-2 border-dashed border-amber-400" />
             起始航线
