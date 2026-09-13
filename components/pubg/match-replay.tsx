@@ -18,6 +18,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Card,
   CardContent,
@@ -863,6 +864,25 @@ function ReplayMap({
   )
 }
 
+type RosterFilter = "all" | ReplayPlayerStatus | "unknown"
+
+const rosterFilterLabels: Record<RosterFilter, string> = {
+  all: "全部",
+  alive: "存活",
+  knocked: "倒地",
+  dead: "淘汰",
+  unknown: "未定位",
+}
+
+function matchesRosterFilter(
+  state: ReplayFramePlayer | undefined,
+  filter: RosterFilter
+) {
+  if (filter === "all") return true
+  if (filter === "unknown") return state === undefined
+  return state?.[3] === filter
+}
+
 function Roster({
   match,
   analysis,
@@ -876,6 +896,8 @@ function Roster({
   selectedPlayerId: string
   onSelect: (playerId: string) => void
 }) {
+  const [query, setQuery] = React.useState("")
+  const [filter, setFilter] = React.useState<RosterFilter>("all")
   const states = currentStates(currentFrame)
   const vehicles = new Map(
     currentFrame?.vehicles?.map((vehicle) => [vehicle.playerIndex, vehicle]) ??
@@ -915,22 +937,71 @@ function Roster({
   const targetTeamId = visiblePlayers.find(
     ({ player }) => player.id === analysis.playerId
   )?.player.teamId
-  const totalPlayers = Math.max(match.participantCount, visiblePlayers.length)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredPlayers = visiblePlayers.filter(({ player }) => {
+    if (
+      normalizedQuery &&
+      !player.name.toLocaleLowerCase().includes(normalizedQuery)
+    ) {
+      return false
+    }
+    const playerIndex = indexById.get(player.id)
+    const state =
+      playerIndex === undefined ? undefined : states.get(playerIndex)
+    return matchesRosterFilter(state, filter)
+  })
+  const telemetryOnlyCount = visiblePlayers.filter(
+    ({ participant }) => participant === undefined
+  ).length
 
   return (
     <div className="rounded-xl border bg-card">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div>
-          <h3 className="text-sm font-semibold">参赛者</h3>
-          <p className="text-xs text-muted-foreground">
-            {analysis.replayPlayers.length} / {totalPlayers} 名玩家有可识别位置
-          </p>
+      <div className="flex flex-col gap-3 border-b px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold">参赛者</h3>
+            <p className="text-xs text-muted-foreground">
+              官方摘要 {match.participantCount} 人 · 回放识别{" "}
+              {analysis.replayPlayers.length} 人
+            </p>
+          </div>
+          <UsersIcon className="size-4 text-muted-foreground" />
         </div>
-        <UsersIcon className="size-4 text-muted-foreground" />
+        {telemetryOnlyCount ? (
+          <p className="text-xs text-muted-foreground">
+            含 {telemetryOnlyCount} 名仅在官方遥测中识别的玩家
+          </p>
+        ) : null}
+        <Input
+          value={query}
+          placeholder="搜索玩家名称"
+          aria-label="搜索参赛者"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <ToggleGroup
+          multiple={false}
+          value={[filter]}
+          onValueChange={(value) => {
+            if (value[0]) setFilter(value[0] as RosterFilter)
+          }}
+          variant="outline"
+          size="sm"
+          className="max-w-full flex-wrap justify-start"
+          aria-label="筛选参赛者状态"
+        >
+          {Object.entries(rosterFilterLabels).map(([value, label]) => (
+            <ToggleGroupItem key={value} value={value}>
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-xs text-muted-foreground">
+          显示 {filteredPlayers.length} / {visiblePlayers.length} 名玩家
+        </p>
       </div>
       <div className="max-h-[25rem] overflow-y-auto p-2">
-        {visiblePlayers.length ? (
-          visiblePlayers.map(({ player, participant }) => {
+        {filteredPlayers.length ? (
+          filteredPlayers.map(({ player, participant }) => {
             const playerIndex = indexById.get(player.id)
             const state =
               playerIndex === undefined ? undefined : states.get(playerIndex)
@@ -938,6 +1009,7 @@ function Roster({
               playerIndex === undefined ? undefined : vehicles.get(playerIndex)
             const isTarget = player.id === analysis.playerId
             const isSelected = player.id === selectedPlayerId
+            const isTelemetryOnly = participant === undefined
             return (
               <Button
                 key={player.id}
@@ -961,6 +1033,9 @@ function Roster({
                   {player.name}
                 </span>
                 {isTarget ? <Badge variant="secondary">目标</Badge> : null}
+                {isTelemetryOnly ? (
+                  <Badge variant="outline">仅遥测</Badge>
+                ) : null}
                 {player.teamId !== undefined ? (
                   <Badge
                     variant={
@@ -988,9 +1063,20 @@ function Roster({
             )
           })
         ) : (
-          <p className="px-2 py-8 text-center text-sm text-muted-foreground">
-            官方接口没有返回参赛者摘要。
-          </p>
+          <Empty className="border-0 px-2 py-8">
+            <EmptyHeader>
+              <EmptyTitle>
+                {visiblePlayers.length
+                  ? "没有匹配的参赛者"
+                  : "官方接口没有返回参赛者摘要"}
+              </EmptyTitle>
+              <EmptyDescription>
+                {visiblePlayers.length
+                  ? "调整搜索关键词或状态筛选后重试。"
+                  : "仍可通过地图和事件时间线查看遥测数据。"}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </div>
     </div>
