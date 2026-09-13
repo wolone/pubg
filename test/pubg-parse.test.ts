@@ -260,6 +260,37 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("switches replay status at the exact event timestamp", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.456",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerKillV2",
+          elapsedTime: 2.2,
+          killer: { accountId: "account.123" },
+          victim: {
+            accountId: "account.456",
+            location: { x: 120, y: 220 },
+          },
+        },
+      ],
+      "account.123",
+      "match-exact-status-time"
+    )
+
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 2.2)
+        ?.players
+    ).toContainEqual([1, 120, 220, "dead", 0])
+  })
+
   it("uses official elapsed time fields for replay synchronization", () => {
     const analysis = parseTelemetry(
       [

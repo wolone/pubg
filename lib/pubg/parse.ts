@@ -778,6 +778,27 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     )
   )
   const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
+  const exactFrameTimes = new Set(
+    sortedChanges
+      .filter(
+        (change) =>
+          change.status !== undefined ||
+          change.vehicleType !== undefined ||
+          change.zones !== undefined ||
+          change.alivePlayers !== undefined ||
+          change.aliveTeams !== undefined ||
+          change.phase !== undefined
+      )
+      .map((change) => change.elapsedSeconds)
+  )
+  const frameTimes = new Set<number>(exactFrameTimes)
+  for (
+    let elapsedSeconds = 0;
+    elapsedSeconds <= durationSeconds;
+    elapsedSeconds += stepSeconds
+  ) {
+    frameTimes.add(elapsedSeconds)
+  }
   const playerIndexById = new Map(playerIds.map((id, index) => [id, index]))
   const states = new Map<string, ReplayState>()
   const frames: ReplayFrame[] = []
@@ -787,11 +808,9 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   let phase: number | undefined
   let changeIndex = 0
 
-  for (
-    let elapsedSeconds = 0;
-    elapsedSeconds <= durationSeconds;
-    elapsedSeconds += stepSeconds
-  ) {
+  for (const elapsedSeconds of Array.from(frameTimes).sort(
+    (left, right) => left - right
+  )) {
     while (
       changeIndex < sortedChanges.length &&
       sortedChanges[changeIndex]!.elapsedSeconds <= elapsedSeconds
@@ -875,7 +894,9 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       phase !== undefined
     ) {
       const frame: ReplayFrame = {
-        elapsedSeconds: Math.round(elapsedSeconds * 10) / 10,
+        elapsedSeconds: exactFrameTimes.has(elapsedSeconds)
+          ? elapsedSeconds
+          : Math.round(elapsedSeconds * 10) / 10,
         players: framePlayers,
       }
       if (frameVehicles.length) frame.vehicles = frameVehicles
