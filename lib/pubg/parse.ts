@@ -37,6 +37,9 @@ const numberValue = (value: unknown, fallback = 0) =>
 const stringValue = (value: unknown, fallback = "") =>
   typeof value === "string" && value.length > 0 ? value : fallback
 
+const MAX_REPLAY_PLAYERS = 100
+const MAX_REPLAY_PLAYER_FRAMES = 64 * 600
+
 function seasonDisplayName(id: string): string {
   const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
   if (numberedSeason) return `第 ${Number(numberedSeason)} 赛季`
@@ -481,7 +484,7 @@ export function parseTelemetry(
       return (positionCounts.get(right) ?? 0) - (positionCounts.get(left) ?? 0)
     })
     .filter((id) => id === playerId || (positionCounts.get(id) ?? 0) > 0)
-    .slice(0, 64)
+    .slice(0, MAX_REPLAY_PLAYERS)
   const replayPlayers = replayPlayerIds
     .map((id) => replayPlayersById.get(id))
     .filter((player): player is ReplayPlayer => Boolean(player))
@@ -672,7 +675,14 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     .filter((change) => !change.playerId || playerIds.includes(change.playerId))
     .sort((left, right) => left.elapsedSeconds - right.elapsedSeconds)
   const durationSeconds = Math.max(0, sortedChanges.at(-1)?.elapsedSeconds ?? 0)
-  const stepSeconds = Math.max(1, Math.ceil(durationSeconds / 600))
+  const maxFrameCount = Math.min(
+    600,
+    Math.max(
+      240,
+      Math.floor(MAX_REPLAY_PLAYER_FRAMES / Math.max(playerIds.length, 1))
+    )
+  )
+  const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
   const playerIndexById = new Map(playerIds.map((id, index) => [id, index]))
   const states = new Map<string, ReplayState>()
   const frames: ReplayFrame[] = []
@@ -700,8 +710,8 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
         const previous = states.get(change.playerId)
         if (change.location) {
           states.set(change.playerId, {
-            x: change.location.x,
-            y: change.location.y,
+            x: Math.round(change.location.x),
+            y: Math.round(change.location.y),
             status: change.status ?? previous?.status ?? "alive",
             health: change.health ?? previous?.health,
             ...(change.vehicleType !== undefined

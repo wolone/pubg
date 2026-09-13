@@ -523,6 +523,39 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("rounds replay map coordinates without changing event locations", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 200.49, y: 300.51, z: 12.34 },
+          },
+        },
+        {
+          _T: "LogPlayerAttack",
+          elapsedTime: 1,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 210.49, y: 310.51, z: 14.34 },
+          },
+        },
+      ],
+      "account.123",
+      "match-rounded-replay"
+    )
+
+    expect(analysis.replayFrames[0]?.players[0]).toEqual([0, 200, 301, "alive"])
+    expect(analysis.timeline[0]?.location).toMatchObject({
+      x: 210.49,
+      y: 310.51,
+    })
+  })
+
   it("preserves key events when the timeline needs compacting", () => {
     const analysis = parseTelemetry(
       [
