@@ -603,6 +603,45 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.flightPath).toEqual([{ x: 140, y: 240, z: 1000 }])
   })
 
+  it("stops the flight path when aircraft telemetry jumps after the drop", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: { location: { x: 100, y: 200, z: 150000 } },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: { location: { x: 200, y: 300, z: 150000 } },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          character: { location: { x: 300, y: 400, z: 150000 } },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 30,
+          character: { location: { x: 700000, y: 700000, z: 100000 } },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+      ],
+      "account.123",
+      "match-flight-path-jump"
+    )
+
+    expect(analysis.flightPath).toEqual([
+      { x: 100, y: 200, z: 150000 },
+      { x: 200, y: 300, z: 150000 },
+      { x: 300, y: 400, z: 150000 },
+    ])
+  })
+
   it("rounds replay map coordinates without changing event locations", () => {
     const analysis = parseTelemetry(
       [

@@ -525,16 +525,7 @@ export function parseTelemetry(
       playerId
     ),
     trajectory: downsample(trajectory, 240),
-    flightPath: downsample(
-      Array.from(flightPathBuckets.entries())
-        .sort(([left], [right]) => left - right)
-        .map(([, point]) => ({
-          x: point.x / point.count,
-          y: point.y / point.count,
-          z: point.z / point.count,
-        })),
-      96
-    ),
+    flightPath: downsample(buildFlightPath(flightPathBuckets), 96),
     replayPlayers,
     replayFrames: replay.frames,
     replayDurationSeconds: replay.durationSeconds,
@@ -641,6 +632,42 @@ function isTransportAircraft(vehicle: Record<string, unknown> | undefined) {
     stringValue(vehicle.vehicleId, "")
   )
   return /transportaircraft/i.test(vehicleType)
+}
+
+function buildFlightPath(
+  buckets: Map<number, { x: number; y: number; z: number; count: number }>
+) {
+  const samples = Array.from(buckets.entries())
+    .sort(([left], [right]) => left - right)
+    .map(([elapsedSeconds, point]) => ({
+      elapsedSeconds,
+      point: {
+        x: point.x / point.count,
+        y: point.y / point.count,
+        z: point.z / point.count,
+      },
+    }))
+  if (samples.length < 3) return samples.map(({ point }) => point)
+
+  const distances = samples.slice(1).map(({ point }, index) => {
+    const previous = samples[index]!.point
+    return Math.hypot(point.x - previous.x, point.y - previous.y)
+  })
+  const sortedDistances = [...distances].sort((left, right) => left - right)
+  const typicalDistance =
+    sortedDistances[Math.floor(sortedDistances.length / 2)]!
+  const maximumSegmentDistance = Math.max(100_000, typicalDistance * 6)
+  const breakIndex = distances.findIndex((distance, index) => {
+    const previous = samples[index]!.point
+    const current = samples[index + 1]!.point
+    return (
+      distance > maximumSegmentDistance ||
+      Math.abs(current.z - previous.z) > 20_000
+    )
+  })
+  const coherentSamples =
+    breakIndex === -1 ? samples : samples.slice(0, breakIndex + 1)
+  return coherentSamples.map(({ point }) => point)
 }
 
 function replayPhaseOf(event: Record<string, unknown>) {
