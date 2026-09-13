@@ -58,16 +58,16 @@ export const MAP_LABELS: Record<string, string> = {
 }
 
 export const MAP_ASSET_PATHS: Record<string, string> = {
-  Baltic_Main: "/maps/Baltic_Main.png",
-  Erangel_Main: "/maps/Erangel_Main.png",
-  Desert_Main: "/maps/Desert_Main.png",
-  Savage_Main: "/maps/Savage_Main.png",
-  DihorOtok_Main: "/maps/DihorOtok_Main.png",
-  Summerland_Main: "/maps/Summerland_Main.png",
-  Chimera_Main: "/maps/Chimera_Main.png",
-  Heaven_Main: "/maps/Heaven_Main.png",
-  Tiger_Main: "/maps/Tiger_Main.png",
-  Kiki_Main: "/maps/Kiki_Main.png",
+  Baltic_Main: "/maps/Baltic_Main.jpg",
+  Erangel_Main: "/maps/Erangel_Main.jpg",
+  Desert_Main: "/maps/Desert_Main.jpg",
+  Savage_Main: "/maps/Savage_Main.jpg",
+  DihorOtok_Main: "/maps/DihorOtok_Main.jpg",
+  Summerland_Main: "/maps/Summerland_Main.jpg",
+  Chimera_Main: "/maps/Chimera_Main.jpg",
+  Heaven_Main: "/maps/Heaven_Main.jpg",
+  Tiger_Main: "/maps/Tiger_Main.jpg",
+  Kiki_Main: "/maps/Kiki_Main.jpg",
   Neon_Main: "/maps/Neon_Main.jpg",
 }
 
