@@ -45,6 +45,14 @@ const MAX_REPLAY_PLAYERS = 100
 const MAX_REPLAY_PLAYER_FRAMES = 48 * 600
 const MAX_REPLAY_FRAME_COUNT = 320
 
+const REPLAY_ATTACK_EVENT_TYPES = new Set([
+  "LogPlayerAttack",
+  "LogPlayerUseThrowable",
+])
+
+const REPLAY_STATE_EVENT_PATTERN =
+  /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i
+
 function seasonDisplayName(id: string): string {
   const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
   if (numberedSeason) return `第 ${Number(numberedSeason)} 赛季`
@@ -650,12 +658,9 @@ export function parseTelemetry(
     const isRelevant =
       type.includes("Kill") ||
       type.includes("Damage") ||
-      type === "LogPlayerAttack" ||
+      REPLAY_ATTACK_EVENT_TYPES.has(type) ||
       type.includes("Death") ||
-      /groggy|knock|revive|rescue/i.test(type) ||
-      type.includes("CarePackage") ||
-      type.includes("VehicleRide") ||
-      type.includes("VehicleLeave") ||
+      REPLAY_STATE_EVENT_PATTERN.test(type) ||
       type === "LogPlayerPosition" ||
       type === "LogPlayerLogin" ||
       type === "LogPlayerCreate"
@@ -1235,6 +1240,7 @@ function timelineMessage(
     return `${actor ?? "玩家"} 对 ${target ?? "目标"} 造成 ${formatDamage(damage)} 点伤害`
   }
   if (type === "LogPlayerAttack") return `${actor ?? "玩家"} 开火`
+  if (type === "LogPlayerUseThrowable") return `${actor ?? "玩家"} 使用投掷物`
   if (/groggy|knock/i.test(type)) return `${target ?? actor ?? "玩家"} 被击倒`
   if (/revive|rescue/i.test(type)) return `${target ?? actor ?? "玩家"} 被救起`
   if (type.includes("Death")) return `${target ?? actor ?? "玩家"} 被淘汰`
@@ -1245,6 +1251,11 @@ function timelineMessage(
   if (type.includes("VehicleLeave")) return `${actor ?? "玩家"} 离开载具`
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
+  if (type === "LogParachuteLanding") return `${actor ?? "玩家"} 着陆`
+  if (type === "LogPlayerRedeploy") return `${actor ?? "玩家"} 重新部署`
+  if (type === "LogVaultStart") return `${actor ?? "玩家"} 翻越障碍物`
+  if (type === "LogSwimStart") return `${actor ?? "玩家"} 开始游泳`
+  if (/SwimEnd|SwimStop/i.test(type)) return `${actor ?? "玩家"} 离开水面`
   return type
 }
 
@@ -1267,7 +1278,7 @@ function compactTimeline(
   )
   const focusedCombat = events.filter(
     (event) =>
-      (event.type.includes("Damage") || event.type === "LogPlayerAttack") &&
+      (event.type.includes("Damage") || REPLAY_ATTACK_EVENT_TYPES.has(event.type)) &&
       focusPlayerId !== undefined &&
       (event.actor === focusPlayerId || event.target === focusPlayerId)
   )

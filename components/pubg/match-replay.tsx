@@ -99,10 +99,16 @@ const eventTypeLabels: Record<string, string> = {
   LogPlayerKillV2: "淘汰",
   LogPlayerLogin: "玩家加入",
   LogPlayerMakeGroggy: "击倒",
+  LogPlayerRedeploy: "重新部署",
   LogPlayerRevive: "救起",
   LogPlayerTakeDamage: "伤害",
+  LogPlayerUseThrowable: "投掷物",
   LogCarePackageLand: "补给箱落地",
   LogCarePackageSpawn: "补给箱生成",
+  LogParachuteLanding: "着陆",
+  LogSwimEnd: "离开水面",
+  LogSwimStart: "开始游泳",
+  LogVaultStart: "翻越",
   LogVehicleLeave: "离开载具",
   LogVehicleRide: "乘上载具",
 }
@@ -128,6 +134,7 @@ function formatDamageType(type: string) {
 
 function formatTimelineEventType(event: MatchAnalysis["timeline"][number]) {
   if (event.type === "LogPlayerAttack") return "开火"
+  if (event.type === "LogPlayerUseThrowable") return "投掷物"
   if (event.type.includes("Damage") && event.damageType) {
     return formatDamageType(event.damageType)
   }
@@ -335,9 +342,11 @@ function replayTimelineKind(
     return "kills"
   }
   if (event.type.includes("Damage")) return "damage"
-  if (event.type.includes("Attack")) return "attacks"
+  if (event.type.includes("Attack") || event.type === "LogPlayerUseThrowable") {
+    return "attacks"
+  }
   if (
-    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
+    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i.test(
       event.type
     )
   ) {
@@ -806,9 +815,9 @@ function matchesTimelineFilter(
     return event.actor === selectedPlayerId || event.target === selectedPlayerId
   }
   if (filter === "combat") {
-    return /Kill|Damage|Death|Attack/.test(event.type)
+    return /Kill|Damage|Death|Attack|Throwable/.test(event.type)
   }
-  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
+  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i.test(
     event.type
   )
 }
@@ -1083,14 +1092,22 @@ function ReplayTimeline({
                   </dd>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <dt className="text-xs text-muted-foreground">位置坐标</dt>
+                  <dt className="text-xs text-muted-foreground">
+                    {selectedEvent.type.includes("Damage")
+                      ? "来源坐标"
+                      : "位置坐标"}
+                  </dt>
                   <dd className="font-mono text-sm">
                     {formatEventLocation(selectedEvent.location)}
                   </dd>
                 </div>
                 {selectedEvent.targetLocation ? (
                   <div className="flex flex-col gap-1">
-                    <dt className="text-xs text-muted-foreground">目标坐标</dt>
+                    <dt className="text-xs text-muted-foreground">
+                      {selectedEvent.type.includes("Damage")
+                        ? "受击坐标"
+                        : "目标坐标"}
+                    </dt>
                     <dd className="font-mono text-sm">
                       {formatEventLocation(selectedEvent.targetLocation)}
                     </dd>
@@ -1924,7 +1941,11 @@ export function MatchReplay({
                     </dd>
                   </div>
                   <div className="flex flex-col gap-1 sm:col-span-2">
-                    <dt className="text-xs text-muted-foreground">发生位置</dt>
+                    <dt className="text-xs text-muted-foreground">
+                      {selectedMapEvent.type.includes("Damage")
+                        ? "攻击者位置"
+                        : "发生位置"}
+                    </dt>
                     <dd className="font-mono text-sm">
                       {formatEventLocation(selectedMapEvent.location)}
                     </dd>
@@ -1932,7 +1953,9 @@ export function MatchReplay({
                   {selectedMapEvent.targetLocation ? (
                     <div className="flex flex-col gap-1 sm:col-span-2">
                       <dt className="text-xs text-muted-foreground">
-                        目标位置
+                        {selectedMapEvent.type.includes("Damage")
+                          ? "受击位置"
+                          : "目标位置"}
                       </dt>
                       <dd className="font-mono text-sm">
                         {formatEventLocation(selectedMapEvent.targetLocation)}

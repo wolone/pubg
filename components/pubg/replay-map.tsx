@@ -119,6 +119,13 @@ export function isGunDamageEvent(event: MatchAnalysis["timeline"][number]) {
   return event.type === "LogPlayerTakeDamage" && event.damageType === "Damage_Gun"
 }
 
+function mapEventLocation(event: MatchAnalysis["timeline"][number]) {
+  if (event.type === "LogPlayerTakeDamage") {
+    return event.targetLocation ?? event.location
+  }
+  return event.location
+}
+
 function isReplayZoneActive(frame: ReplayFrame) {
   return frame.phase === undefined || frame.phase >= 1
 }
@@ -327,8 +334,9 @@ function MapEventButton({
   model: ReturnType<typeof createMapModel>
   onSelect: (event: MatchAnalysis["timeline"][number]) => void
 }) {
-  if (!event.location) return null
-  const point = model.projectPoint(event.location)
+  const location = mapEventLocation(event)
+  if (!location) return null
+  const point = model.projectPoint(location)
   const left = (point.x - model.bounds.minX) / model.bounds.width
   const top = (point.y - model.bounds.minY) / model.bounds.height
   if (left < 0 || left > 1 || top < 0 || top > 1) return null
@@ -595,13 +603,14 @@ export function ReplayMap({
   const visibleDamage = analysis.timeline.filter(
     (event) =>
       event.type.includes("Damage") &&
-      event.location &&
+      mapEventLocation(event) &&
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
   )
   const visibleAttacks = analysis.timeline.filter(
     (event) =>
-      event.type === "LogPlayerAttack" &&
+      (event.type === "LogPlayerAttack" ||
+        event.type === "LogPlayerUseThrowable") &&
       event.location &&
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
@@ -908,8 +917,9 @@ export function ReplayMap({
             : null}
           {showEvents && visibleTimelineLayers.includes("damage")
             ? visibleDamage.map((event, index) => {
-                if (!event.location) return null
-                const point = model.projectPoint(event.location)
+                const location = mapEventLocation(event)
+                if (!location) return null
+                const point = model.projectPoint(location)
                 return (
                   <circle
                     key={`damage-${event.timestamp}-${index}`}

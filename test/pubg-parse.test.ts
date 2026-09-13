@@ -675,6 +675,64 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toContain("34.5 点伤害")
   })
 
+  it("keeps official movement and throwable events in the replay timeline", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogParachuteLanding",
+          elapsedTime: 12,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerUseThrowable",
+          elapsedTime: 20,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 120, y: 220 },
+          },
+        },
+        {
+          _T: "LogVaultStart",
+          elapsedTime: 21,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 122, y: 222 },
+          },
+        },
+        {
+          _T: "LogSwimStart",
+          elapsedTime: 22,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 124, y: 224 },
+          },
+        },
+      ],
+      "account.123",
+      "match-movement-events"
+    )
+
+    expect(analysis.timeline.map((event) => event.type)).toEqual([
+      "LogParachuteLanding",
+      "LogPlayerUseThrowable",
+      "LogVaultStart",
+      "LogSwimStart",
+    ])
+    expect(analysis.timeline.map((event) => event.message)).toEqual([
+      "TestPlayer 着陆",
+      "TestPlayer 使用投掷物",
+      "TestPlayer 翻越障碍物",
+      "TestPlayer 开始游泳",
+    ])
+  })
+
   it("describes incoming damage without inventing an attacker", () => {
     const analysis = parseTelemetry(
       [
