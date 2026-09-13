@@ -209,7 +209,8 @@ function locationOf(value: unknown) {
   const x = numberValue(location.x, Number.NaN)
   const y = numberValue(location.y, Number.NaN)
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
-  return { x, y, z: numberValue(location.z) }
+  const z = numberValue(location.z, Number.NaN)
+  return { x, y, ...(Number.isFinite(z) ? { z } : {}) }
 }
 
 const AIRBORNE_Z_THRESHOLD = 20_000

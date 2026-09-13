@@ -207,6 +207,11 @@ describe("PUBG JSON:API parser", () => {
       { id: "account.123", name: "TestPlayer" },
       { id: "account.456", name: "Opponent" },
     ])
+    expect(analysis.timeline[0]?.location).toEqual({ x: 120, y: 240 })
+    expect(analysis.timeline[0]?.targetLocation).toEqual({
+      x: 125,
+      y: 245,
+    })
     expect(analysis.timeline[0]?.message).toBe("TestPlayer 淘汰了 Opponent")
   })
 
@@ -899,7 +904,7 @@ describe("PUBG JSON:API parser", () => {
       location: { x: 200, y: 300 },
       message: "TestPlayer 开火",
     })
-    expect(analysis.trajectory).toEqual([{ x: 200, y: 300, z: 0 }])
+    expect(analysis.trajectory).toEqual([{ x: 200, y: 300 }])
   })
 
   it("tracks vehicle state without retaining raw vehicle telemetry", () => {
