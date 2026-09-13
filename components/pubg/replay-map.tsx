@@ -401,7 +401,7 @@ export function ReplayMap({
     if (event.button !== 0) return
     if (
       event.target instanceof Element &&
-      event.target.closest("[data-map-event-marker]")
+      event.target.closest("[data-map-event-marker], [data-map-control]")
     ) {
       return
     }
@@ -1125,6 +1125,7 @@ export function ReplayMap({
           variant="outline"
           size="sm"
           aria-label="切换回放地图图层"
+          data-map-control="true"
           className="pointer-events-auto bg-background/85"
         >
           <ToggleGroupItem value="flightPath" aria-label="切换起始航线">
@@ -1144,7 +1145,10 @@ export function ReplayMap({
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
-      <div className="absolute right-3 bottom-12 flex flex-col gap-1">
+      <div
+        data-map-control="true"
+        className="absolute right-3 bottom-12 flex flex-col gap-1"
+      >
         <Button
           type="button"
           size="icon-sm"
