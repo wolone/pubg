@@ -2553,7 +2553,7 @@ export function MatchReplay({
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
-                    <div className="relative pt-20 pb-12">
+                    <div className="relative pt-20 pb-16">
                       <div
                         className="pointer-events-none absolute inset-y-0 z-10 w-px bg-foreground/70"
                         style={{
@@ -2573,6 +2573,13 @@ export function MatchReplay({
                           )
                         }
                       />
+                      <div className="mt-2 flex justify-between font-mono text-[10px] text-muted-foreground tabular-nums">
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+                          <span key={ratio}>
+                            {formatTime(duration * ratio)}
+                          </span>
+                        ))}
+                      </div>
                       {visibleTimelineLayers.some(
                         (layer) =>
                           layer === "kills" ||
