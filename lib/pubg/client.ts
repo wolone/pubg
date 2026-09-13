@@ -123,13 +123,17 @@ export async function getMatch(
 export async function getMatchAnalysis(
   platform: Platform,
   matchId: string,
-  playerId: string
+  playerId: string,
+  existingMatch?: MatchSummary & { telemetryUrl: string | null }
 ): Promise<MatchAnalysis> {
-  const document = await request<JsonApiDocument>(
-    `${API_ROOT}/shards/${shard(platform)}/matches/${encodeURIComponent(matchId)}`,
-    "match_not_found"
-  )
-  const match = parseMatchDocument(document, platform, playerId)
+  let match = existingMatch
+  if (!match) {
+    const document = await request<JsonApiDocument>(
+      `${API_ROOT}/shards/${shard(platform)}/matches/${encodeURIComponent(matchId)}`,
+      "match_not_found"
+    )
+    match = parseMatchDocument(document, platform, playerId)
+  }
   assertMatchFresh(match.startedAt)
 
   if (!match.telemetryUrl) {

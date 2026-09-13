@@ -31,7 +31,8 @@ export async function GET(
     const analysis = await getMatchAnalysis(
       platform as Platform,
       matchId,
-      playerId
+      playerId,
+      match
     )
     await repository.upsertAnalysis(platform as Platform, analysis)
     return ok(analysis)
