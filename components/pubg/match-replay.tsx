@@ -2027,7 +2027,11 @@ function ReplayEventMarkers({
               Math.abs(seconds - currentTime) <= 0.5 ? "time" : undefined
             }
             aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
-            onClick={() => onSeek(seconds)}
+            onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+            onClick={(clickEvent) => {
+              clickEvent.stopPropagation()
+              onSeek(seconds)
+            }}
           >
             <span className="size-1.5 rounded-full bg-current" />
           </Button>
@@ -2077,7 +2081,11 @@ function ReplayZoneMarkers({
             style={{ left: `${position}%` }}
             aria-current={index === activeMarkerIndex ? "time" : undefined}
             aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
-            onClick={() => onSeek(frame.elapsedSeconds)}
+            onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+            onClick={(clickEvent) => {
+              clickEvent.stopPropagation()
+              onSeek(frame.elapsedSeconds)
+            }}
           >
             <span className="size-1.5 rotate-45 rounded-[1px] bg-blue-500" />
           </Button>
