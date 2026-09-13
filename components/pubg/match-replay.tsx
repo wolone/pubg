@@ -437,6 +437,40 @@ type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
 type ReplayTimelineLayer = "events" | "zones"
 
+function MapEventMarker({
+  event,
+  onSelect,
+  children,
+}: {
+  event: MatchAnalysis["timeline"][number]
+  onSelect: (event: MatchAnalysis["timeline"][number]) => void
+  children: React.ReactNode
+}) {
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      className="pointer-events-auto cursor-pointer"
+      aria-label={`打开事件 ${formatTime(event.elapsedSeconds ?? 0)}：${event.message}`}
+      onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+      onClick={(pointerEvent) => {
+        pointerEvent.stopPropagation()
+        onSelect(event)
+      }}
+      onKeyDown={(keyboardEvent) => {
+        if (keyboardEvent.key !== "Enter" && keyboardEvent.key !== " ") {
+          return
+        }
+        keyboardEvent.preventDefault()
+        keyboardEvent.stopPropagation()
+        onSelect(event)
+      }}
+    >
+      {children}
+    </g>
+  )
+}
+
 function ReplayMap({
   mapName,
   analysis,
@@ -451,6 +485,7 @@ function ReplayMap({
   onPanChange,
   onZoom,
   onReset,
+  onEventSelect,
 }: {
   mapName: string
   analysis: MatchAnalysis
@@ -465,6 +500,7 @@ function ReplayMap({
   onPanChange: (pan: MapPan) => void
   onZoom: (delta: number) => void
   onReset: () => void
+  onEventSelect: (event: MatchAnalysis["timeline"][number]) => void
 }) {
   const showFlightPath = visibleLayers.includes("flightPath")
   const showTrajectory = visibleLayers.includes("trajectory")
@@ -800,7 +836,11 @@ function ReplayMap({
           {showEvents
             ? visibleKills.map((kill, index) =>
                 kill.location ? (
-                  <g key={`${kill.timestamp}-${index}`}>
+                  <MapEventMarker
+                    key={`${kill.timestamp}-${index}`}
+                    event={kill}
+                    onSelect={onEventSelect}
+                  >
                     <title>{kill.message}</title>
                     <circle
                       cx={kill.location.x}
@@ -829,30 +869,39 @@ function ReplayMap({
                           : "var(--chart-5)"
                       }
                     />
-                  </g>
+                  </MapEventMarker>
                 ) : null
               )
             : null}
           {showEvents
             ? visibleDamage.map((event, index) =>
                 event.location ? (
-                  <circle
+                  <MapEventMarker
                     key={`${event.timestamp}-${index}`}
-                    cx={event.location.x}
-                    cy={event.location.y}
-                    r={Math.max(bounds.width / 350, 4)}
-                    fill="var(--chart-3)"
-                    fillOpacity="0.7"
-                    stroke="var(--background)"
-                    strokeWidth={Math.max(bounds.width / 500000, 2)}
-                  />
+                    event={event}
+                    onSelect={onEventSelect}
+                  >
+                    <circle
+                      cx={event.location.x}
+                      cy={event.location.y}
+                      r={Math.max(bounds.width / 350, 4)}
+                      fill="var(--chart-3)"
+                      fillOpacity="0.7"
+                      stroke="var(--background)"
+                      strokeWidth={Math.max(bounds.width / 500000, 2)}
+                    />
+                  </MapEventMarker>
                 ) : null
               )
             : null}
           {showEvents
             ? visibleAttacks.map((event, index) =>
                 event.location ? (
-                  <g key={`attack-${event.timestamp}-${index}`}>
+                  <MapEventMarker
+                    key={`attack-${event.timestamp}-${index}`}
+                    event={event}
+                    onSelect={onEventSelect}
+                  >
                     <title>{event.message}</title>
                     <path
                       d={`M ${event.location.x - Math.max(bounds.width / 260, 5)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 260, 5)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 260, 5)} V ${event.location.y + Math.max(bounds.width / 260, 5)}`}
@@ -861,7 +910,7 @@ function ReplayMap({
                       strokeWidth={Math.max(bounds.width / 500000, 2)}
                       strokeLinecap="round"
                     />
-                  </g>
+                  </MapEventMarker>
                 ) : null
               )
             : null}
@@ -886,7 +935,11 @@ function ReplayMap({
           {showEvents
             ? visibleCarePackages.map((event, index) =>
                 event.location ? (
-                  <g key={`care-package-${event.timestamp}-${index}`}>
+                  <MapEventMarker
+                    key={`care-package-${event.timestamp}-${index}`}
+                    event={event}
+                    onSelect={onEventSelect}
+                  >
                     <rect
                       x={event.location.x - Math.max(bounds.width / 170, 8)}
                       y={event.location.y - Math.max(bounds.width / 170, 8)}
@@ -904,7 +957,7 @@ function ReplayMap({
                       strokeWidth={Math.max(bounds.width / 500000, 2)}
                       strokeLinecap="round"
                     />
-                  </g>
+                  </MapEventMarker>
                 ) : null
               )
             : null}
@@ -1847,6 +1900,9 @@ export function MatchReplay({
   const [selectedPlayerId, setSelectedPlayerId] = React.useState(
     analysis.playerId
   )
+  const [selectedMapEvent, setSelectedMapEvent] = React.useState<
+    MatchAnalysis["timeline"][number] | null
+  >(null)
   const currentTimeRef = React.useRef(0)
 
   React.useEffect(() => {
@@ -1966,6 +2022,11 @@ export function MatchReplay({
                 onReset={() => {
                   setMapScale(1)
                   setMapPan({ x: 0, y: 0 })
+                }}
+                onEventSelect={(event) => {
+                  setPlaying(false)
+                  setTime(event.elapsedSeconds ?? 0)
+                  setSelectedMapEvent(event)
                 }}
               />
               {analysis.replayPlayers.length ? (
@@ -2178,6 +2239,92 @@ export function MatchReplay({
             }}
           />
         ) : null}
+        <Dialog
+          open={selectedMapEvent !== null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedMapEvent(null)
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            {selectedMapEvent ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>地图事件</DialogTitle>
+                  <DialogDescription>
+                    {selectedMapEvent.message}
+                  </DialogDescription>
+                </DialogHeader>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">事件类型</dt>
+                    <dd>
+                      <Badge
+                        variant={
+                          selectedMapEvent.type.includes("Kill")
+                            ? "default"
+                            : "outline"
+                        }
+                      >
+                        {formatTimelineEventType(selectedMapEvent)}
+                      </Badge>
+                    </dd>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">回放时间</dt>
+                    <dd className="font-mono text-sm">
+                      T+{formatTime(selectedMapEvent.elapsedSeconds ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col gap-1 sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground">发生位置</dt>
+                    <dd className="font-mono text-sm">
+                      {formatEventLocation(selectedMapEvent.location)}
+                    </dd>
+                  </div>
+                  {selectedMapEvent.targetLocation ? (
+                    <div className="flex flex-col gap-1 sm:col-span-2">
+                      <dt className="text-xs text-muted-foreground">
+                        目标位置
+                      </dt>
+                      <dd className="font-mono text-sm">
+                        {formatEventLocation(selectedMapEvent.targetLocation)}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {selectedMapEvent.damage !== undefined ? (
+                    <div className="flex flex-col gap-1">
+                      <dt className="text-xs text-muted-foreground">伤害</dt>
+                      <dd className="text-sm">
+                        {formatDamage(selectedMapEvent.damage)} 点
+                      </dd>
+                    </div>
+                  ) : null}
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">发起玩家</dt>
+                    <dd className="truncate text-sm">
+                      {selectedMapEvent.actor
+                        ? (playerNames.get(selectedMapEvent.actor) ??
+                          selectedMapEvent.actor)
+                        : "未知玩家"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-xs text-muted-foreground">目标玩家</dt>
+                    <dd className="truncate text-sm">
+                      {selectedMapEvent.target
+                        ? (playerNames.get(selectedMapEvent.target) ??
+                          selectedMapEvent.target)
+                        : "无目标玩家"}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                  已跳转到该事件；下方事件时间线可查看完整遥测信息。
+                </p>
+              </>
+            ) : null}
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )
