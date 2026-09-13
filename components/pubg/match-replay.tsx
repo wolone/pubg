@@ -1966,7 +1966,7 @@ function ReplayEventMarkers({
   visibleKinds: ReplayTimelineLayer[]
   onSeek: (seconds: number) => void
 }) {
-  const markerLaneOffsets = [-12, 0, 12]
+  const markerLaneOffsets = [-24, 0, 24]
   const minimumMarkerGapSeconds = Math.max(8, duration / 40)
   const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
   const markers = events
@@ -2001,7 +2001,7 @@ function ReplayEventMarkers({
   if (duration <= 0 || markers.length === 0) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 h-5">
+    <div className="pointer-events-none absolute inset-x-0 top-0 h-16">
       {markers.map(({ event, seconds, lane }, index) => {
         const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
         return (
@@ -2390,7 +2390,7 @@ export function MatchReplay({
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
-                    <div className="relative pt-12 pb-5">
+                    <div className="relative pt-20 pb-5">
                       <Slider
                         value={[currentTime]}
                         min={0}
