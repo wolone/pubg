@@ -366,82 +366,79 @@ type ReplayMapBounds = {
   height: number
 }
 
-function extendRayToBounds(
-  point: ReplayMapPoint,
-  direction: { x: number; y: number },
-  bounds: ReplayMapBounds,
-  allowOpposite = true
+function clipFlightSegmentToBounds(
+  start: ReplayMapPoint,
+  end: ReplayMapPoint,
+  bounds: ReplayMapBounds
 ) {
   const maxX = bounds.minX + bounds.width
   const maxY = bounds.minY + bounds.height
-  const candidates: number[] = []
-  const addCandidate = (distance: number) => {
-    if (!Number.isFinite(distance) || distance < 0) return
-    const x = point.x + direction.x * distance
-    const y = point.y + direction.y * distance
-    const epsilon = Math.max(bounds.width, bounds.height) * 1e-8
-    if (
-      x >= bounds.minX - epsilon &&
-      x <= maxX + epsilon &&
-      y >= bounds.minY - epsilon &&
-      y <= maxY + epsilon
-    ) {
-      candidates.push(distance)
+  const deltaX = end.x - start.x
+  const deltaY = end.y - start.y
+  let entry = 0
+  let exit = 1
+
+  const updateInterval = (coefficient: number, constant: number) => {
+    if (coefficient === 0) return constant >= 0
+    const value = constant / coefficient
+    if (coefficient < 0) {
+      entry = Math.max(entry, value)
+    } else {
+      exit = Math.min(exit, value)
     }
+    return entry <= exit
   }
 
-  if (direction.x !== 0) {
-    addCandidate((maxX - point.x) / direction.x)
-    addCandidate((bounds.minX - point.x) / direction.x)
-  }
-  if (direction.y !== 0) {
-    addCandidate((maxY - point.y) / direction.y)
-    addCandidate((bounds.minY - point.y) / direction.y)
+  if (
+    !updateInterval(-deltaX, start.x - bounds.minX) ||
+    !updateInterval(deltaX, maxX - start.x) ||
+    !updateInterval(-deltaY, start.y - bounds.minY) ||
+    !updateInterval(deltaY, maxY - start.y)
+  ) {
+    return null
   }
 
-  const distance = Math.min(...candidates)
-  if (!Number.isFinite(distance)) {
-    if (allowOpposite) {
-      return extendRayToBounds(
-        point,
-        { x: -direction.x, y: -direction.y },
-        bounds,
-        false
-      )
-    }
-    return point
-  }
-  return {
-    x: point.x + direction.x * distance,
-    y: point.y + direction.y * distance,
-  }
+  const pointAt = (progress: number): ReplayMapPoint => ({
+    x: start.x + deltaX * progress,
+    y: start.y + deltaY * progress,
+    ...(start.z !== undefined && end.z !== undefined
+      ? { z: start.z + (end.z - start.z) * progress }
+      : start.z !== undefined
+        ? { z: start.z }
+        : end.z !== undefined
+          ? { z: end.z }
+          : {}),
+  })
+
+  return [pointAt(entry), pointAt(exit)] as const
 }
 
-function extendFlightPathToBounds(
+function clipFlightPathToBounds(
   points: ReplayMapPoint[],
   bounds: ReplayMapBounds
 ) {
   if (points.length < 2) return points
-  const first = points[0]!
-  const second = points[1]!
-  const last = points.at(-1)!
-  const previous = points.at(-2)!
-  const extendedStart = extendRayToBounds(
-    first,
-    { x: first.x - second.x, y: first.y - second.y },
-    bounds
-  )
-  const extendedEnd = extendRayToBounds(
-    last,
-    { x: last.x - previous.x, y: last.y - previous.y },
-    bounds
-  )
+  const clipped: ReplayMapPoint[] = []
+  const samePoint = (left: ReplayMapPoint, right: ReplayMapPoint) =>
+    Math.abs(left.x - right.x) < 0.001 && Math.abs(left.y - right.y) < 0.001
 
-  return [
-    { ...first, ...extendedStart },
-    ...points.slice(1, -1),
-    { ...last, ...extendedEnd },
-  ]
+  for (let index = 1; index < points.length; index += 1) {
+    const segment = clipFlightSegmentToBounds(
+      points[index - 1]!,
+      points[index]!,
+      bounds
+    )
+    if (!segment) continue
+    const [start, end] = segment
+    if (!clipped.at(-1) || !samePoint(clipped.at(-1)!, start)) {
+      clipped.push(start)
+    }
+    if (!clipped.at(-1) || !samePoint(clipped.at(-1)!, end)) {
+      clipped.push(end)
+    }
+  }
+
+  return clipped.length >= 2 ? clipped : []
 }
 
 function currentStates(frame: ReplayFrame | null) {
@@ -573,7 +570,7 @@ function ReplayMap({
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
   const trackedPlayer = analysis.replayPlayers[targetIndex]
   const flightPathPoints = React.useMemo(
-    () => extendFlightPathToBounds(analysis.flightPath, bounds),
+    () => clipFlightPathToBounds(analysis.flightPath, bounds),
     [analysis.flightPath, bounds]
   )
   const extendedFlightPath = flightPathPoints
