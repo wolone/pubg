@@ -212,6 +212,12 @@ function locationOf(value: unknown) {
   return { x, y, z: numberValue(location.z) }
 }
 
+const AIRBORNE_Z_THRESHOLD = 20_000
+
+function isAirborneLocation(location: { z?: number }) {
+  return location.z !== undefined && location.z > AIRBORNE_Z_THRESHOLD
+}
+
 function telemetryCharacter(event: Record<string, unknown>, key: string) {
   const character = event[key]
   return character && typeof character === "object"
@@ -318,6 +324,7 @@ export function parseTelemetry(
     const vehicleType = vehicleTypeOf(vehicle)
     const isFlightPosition =
       type === "LogPlayerPosition" && location && isTransportAircraft(vehicle)
+    const isPlayerAirborne = location ? isAirborneLocation(location) : false
 
     if (isFlightPosition) {
       const bucket = Math.max(0, Math.round(elapsedSeconds))
@@ -379,7 +386,7 @@ export function parseTelemetry(
 
     const replayPlayerId = characterId ?? actor
     if (replayPlayerId) {
-      if (location && !isFlightPosition) {
+      if (location && !isFlightPosition && !isPlayerAirborne) {
         replayChanges.push({
           elapsedSeconds,
           playerId: replayPlayerId,
@@ -458,6 +465,7 @@ export function parseTelemetry(
       actor === playerId &&
       location &&
       !isFlightPosition &&
+      !isPlayerAirborne &&
       (type === "LogPlayerPosition" || type === "LogPlayerAttack")
     ) {
       trajectory.push(location)

@@ -581,6 +581,15 @@ describe("PUBG JSON:API parser", () => {
           vehicle: { vehicleType: "TransportAircraft" },
         },
         {
+          _T: "LogPlayerAttack",
+          elapsedTime: 15,
+          attacker: {
+            accountId: "account.123",
+            location: { x: 250, y: 350, z: 101000 },
+          },
+          attackType: "Weapon",
+        },
+        {
           _T: "LogPlayerPosition",
           elapsedTime: 0,
           character: {
