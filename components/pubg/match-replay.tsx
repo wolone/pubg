@@ -64,7 +64,7 @@ import type {
 
 const SPEEDS = [0.5, 1, 2, 4] as const
 const MAP_ZOOM_MIN = 1
-const MAP_ZOOM_MAX = 8
+const MAP_ZOOM_MAX = 16
 const MAP_ZOOM_STEP = 0.25
 
 const MAP_SIZES: Record<string, number> = {
@@ -677,6 +677,7 @@ function ReplayMap({
   const selectedIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === selectedPlayerId
   )
+  const markerZoomFactor = Math.sqrt(Math.max(mapScale, MAP_ZOOM_MIN))
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
   const trackedPlayer = analysis.replayPlayers[targetIndex]
   const flightPathPoints = React.useMemo(
@@ -786,9 +787,21 @@ function ReplayMap({
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!panRef.current) return
-    onPanChange({
+    const nextPan = {
       x: panRef.current.pan.x + event.clientX - panRef.current.startX,
       y: panRef.current.pan.y + event.clientY - panRef.current.startY,
+    }
+    const maxPanX = Math.max(
+      0,
+      (event.currentTarget.clientWidth * (mapScale - 1)) / 2
+    )
+    const maxPanY = Math.max(
+      0,
+      (event.currentTarget.clientHeight * (mapScale - 1)) / 2
+    )
+    onPanChange({
+      x: Math.min(Math.max(nextPan.x, -maxPanX), maxPanX),
+      y: Math.min(Math.max(nextPan.y, -maxPanY), maxPanY),
     })
   }
 
@@ -1137,7 +1150,10 @@ function ReplayMap({
               ) {
                 return null
               }
-              const radius = Math.max(bounds.width / (isTarget ? 90 : 180), 7)
+              const radius = Math.max(
+                bounds.width / (isTarget ? 100 : 140) / markerZoomFactor,
+                7
+              )
               const markerColor =
                 player.teamId === undefined
                   ? statusColors[status]
@@ -1207,9 +1223,12 @@ function ReplayMap({
                   />
                   <text
                     x={x}
-                    y={y + Math.max(bounds.width / 360, 5)}
+                    y={y + Math.max(bounds.width / 360 / markerZoomFactor, 5)}
                     fill="var(--background)"
-                    fontSize={Math.max(bounds.width / 260, 8)}
+                    fontSize={Math.max(
+                      bounds.width / 260 / markerZoomFactor,
+                      8
+                    )}
                     fontWeight="700"
                     textAnchor="middle"
                     paintOrder="stroke"
@@ -1224,7 +1243,10 @@ function ReplayMap({
                       x={x}
                       y={y - radius * 2}
                       fill="currentColor"
-                      fontSize={Math.max(bounds.width / 45, 12)}
+                      fontSize={Math.max(
+                        bounds.width / 45 / markerZoomFactor,
+                        12
+                      )}
                       fontWeight="600"
                       textAnchor="middle"
                     >
