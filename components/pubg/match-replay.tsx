@@ -441,6 +441,10 @@ function getRosterTeamKey(teamId: number | undefined) {
   return teamId === undefined ? "unknown" : String(teamId)
 }
 
+function isBotReplayParticipant(id: string) {
+  return /^(?:ai|npc)\./i.test(id)
+}
+
 function rosterTeamLabel(teamId: number | undefined) {
   return teamId === undefined ? "未分组" : "队 " + teamId
 }
@@ -505,19 +509,22 @@ function Roster({
     match.participants.map((participant) => [participant.id, participant])
   )
   const visiblePlayers: RosterPlayer[] = [
-    ...match.participants.map((participant) => ({
-      participant,
-      player: {
-        ...(replayPlayersById.get(participant.id) ?? {}),
-        id: participant.id,
-        name: replayPlayersById.get(participant.id)?.name ?? participant.name,
-        ...(replayPlayersById.get(participant.id)?.teamId !== undefined
-          ? { teamId: replayPlayersById.get(participant.id)?.teamId }
-          : participant.teamId !== undefined
-            ? { teamId: participant.teamId }
-            : {}),
-      },
-    })),
+    ...match.participants
+      .filter((participant) => !isBotReplayParticipant(participant.id))
+      .map((participant) => ({
+        participant,
+        player: {
+          ...(replayPlayersById.get(participant.id) ?? {}),
+          id: participant.id,
+          name:
+            replayPlayersById.get(participant.id)?.name ?? participant.name,
+          ...(replayPlayersById.get(participant.id)?.teamId !== undefined
+            ? { teamId: replayPlayersById.get(participant.id)?.teamId }
+            : participant.teamId !== undefined
+              ? { teamId: participant.teamId }
+              : {}),
+        },
+      })),
     ...analysis.replayPlayers
       .filter((player) => !participantsById.has(player.id))
       .map((player) => ({ player, participant: undefined })),
