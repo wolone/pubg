@@ -107,6 +107,8 @@ describe("PUBG JSON:API parser", () => {
       180,
       300,
       "alive",
+      undefined,
+      1,
     ])
     expect(analysis.replayFrames.find((frame) => frame.zones)?.zones).toEqual({
       bluezone: { x: 410, y: 510, radius: 120 },
@@ -114,6 +116,71 @@ describe("PUBG JSON:API parser", () => {
       redzone: { x: 600, y: 700, radius: 80 },
       blackzone: null,
     })
+  })
+
+  it("accumulates combat stats in replay frames", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.attacker",
+            name: "Attacker",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.victim",
+            name: "Victim",
+            location: { x: 120, y: 220 },
+          },
+        },
+        {
+          _T: "LogPlayerTakeDamage",
+          elapsedTime: 5,
+          attacker: {
+            accountId: "account.attacker",
+            name: "Attacker",
+            location: { x: 100, y: 200 },
+          },
+          victim: {
+            accountId: "account.victim",
+            name: "Victim",
+            location: { x: 120, y: 220 },
+          },
+          damage: 27.5,
+          damageTypeCategory: "Damage_Gun",
+        },
+        {
+          _T: "LogPlayerKill",
+          elapsedTime: 8,
+          killer: {
+            accountId: "account.attacker",
+            name: "Attacker",
+            location: { x: 100, y: 200 },
+          },
+          victim: {
+            accountId: "account.victim",
+            name: "Victim",
+            location: { x: 120, y: 220 },
+          },
+        },
+      ],
+      "account.attacker",
+      "match-combat"
+    )
+    const attackerIndex = analysis.replayPlayers.findIndex(
+      (player) => player.id === "account.attacker"
+    )
+    const startFrame = analysis.replayFrames[0]
+    const endFrame = analysis.replayFrames.at(-1)
+    expect(startFrame?.players[attackerIndex]?.[5]).toBeUndefined()
+    expect(endFrame?.players[attackerIndex]?.[5]).toBe(1)
+    expect(endFrame?.players[attackerIndex]?.[6]).toBe(27.5)
   })
 
   it("carries participant group ids into replay players", () => {

@@ -117,6 +117,8 @@ export type ReplayFramePlayer = [
   y: number,
   status: ReplayPlayerStatus,
   health?: number,
+  kills?: number,
+  damage?: number,
 ]
 
 export interface ReplayFrame {

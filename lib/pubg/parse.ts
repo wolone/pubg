@@ -420,6 +420,27 @@ export function parseTelemetry(
       positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
     }
 
+    if (type.includes("Kill") && actor && target && actor !== target) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: actor,
+        killsDelta: 1,
+      })
+    }
+    if (
+      type.includes("Damage") &&
+      actor &&
+      target &&
+      actor !== target &&
+      damage !== undefined
+    ) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: actor,
+        damageDelta: damage,
+      })
+    }
+
     if (type.includes("Kill")) {
       if (target) {
         replayChanges.push({
@@ -549,6 +570,8 @@ type ReplayChange = {
   status?: ReplayPlayerStatus
   health?: number
   vehicleType?: string | null
+  killsDelta?: number
+  damageDelta?: number
   zones?: ReplayZones
   alivePlayers?: number
   aliveTeams?: number
@@ -561,6 +584,8 @@ type ReplayState = {
   status: ReplayPlayerStatus
   health?: number
   vehicleType?: string
+  kills: number
+  damage: number
 }
 
 function timestampOf(event: Record<string, unknown>): number | null {
@@ -825,6 +850,8 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
             y: Math.round(change.location.y),
             status: change.status ?? previous?.status ?? "alive",
             health: change.health ?? previous?.health,
+            kills: previous?.kills ?? 0,
+            damage: previous?.damage ?? 0,
             ...(change.vehicleType !== undefined
               ? change.vehicleType === null
                 ? {}
@@ -837,12 +864,20 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
           previous &&
           (change.status !== undefined ||
             change.health !== undefined ||
-            change.vehicleType !== undefined)
+            change.vehicleType !== undefined ||
+            change.killsDelta !== undefined ||
+            change.damageDelta !== undefined)
         ) {
           states.set(change.playerId, {
             ...previous,
             ...(change.status ? { status: change.status } : {}),
             ...(change.health !== undefined ? { health: change.health } : {}),
+            ...(change.killsDelta !== undefined
+              ? { kills: previous.kills + change.killsDelta }
+              : {}),
+            ...(change.damageDelta !== undefined
+              ? { damage: previous.damage + change.damageDelta }
+              : {}),
             ...(change.vehicleType !== undefined
               ? change.vehicleType === null
                 ? { vehicleType: undefined }
@@ -865,6 +900,10 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
           state.status,
         ]
         if (state.health !== undefined) player[4] = state.health
+        if (state.kills > 0) player[5] = state.kills
+        if (state.damage > 0) {
+          player[6] = Math.round(state.damage * 10) / 10
+        }
         return player
       })
       .filter((player): player is ReplayFrame["players"][number] =>

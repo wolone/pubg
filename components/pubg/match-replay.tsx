@@ -5,6 +5,7 @@ import {
   ActivityIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  ChevronDownIcon,
   CrosshairIcon,
   Maximize2Icon,
   MinusIcon,
@@ -125,6 +126,17 @@ function teamMarkerColor(teamId: number | undefined) {
   if (teamId === undefined) return "var(--muted-foreground)"
   const hue = (((teamId * 137.508) % 360) + 360) % 360
   return `hsl(${hue.toFixed(1)} 78% 52%)`
+}
+
+function healthPercentage(value: number | undefined) {
+  if (value === undefined || !Number.isFinite(value)) return undefined
+  return Math.min(100, Math.max(0, value))
+}
+
+function healthColor(value: number) {
+  if (value <= 25) return "var(--destructive)"
+  if (value <= 60) return "var(--chart-3)"
+  return "var(--chart-2)"
 }
 
 const eventTypeLabels: Record<string, string> = {
@@ -304,6 +316,15 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
           ? leftPlayer[4] + (rightPlayer[4] - leftPlayer[4]) * progress
           : (leftPlayer?.[4] ?? rightPlayer?.[4])
     }
+    const rightFrameActive = progress >= 0.5
+    const kills = rightFrameActive
+      ? (rightPlayer?.[5] ?? leftPlayer?.[5])
+      : (leftPlayer?.[5] ?? rightPlayer?.[5])
+    const damage = rightFrameActive
+      ? (rightPlayer?.[6] ?? leftPlayer?.[6])
+      : (leftPlayer?.[6] ?? rightPlayer?.[6])
+    if (kills !== undefined) nextPlayer[5] = kills
+    if (damage !== undefined) nextPlayer[6] = damage
     return [nextPlayer]
   })
 
@@ -626,6 +647,7 @@ function ReplayMap({
   onZoom,
   onReset,
   onEventSelect,
+  onPlayerSelect,
 }: {
   mapName: string
   analysis: MatchAnalysis
@@ -642,6 +664,7 @@ function ReplayMap({
   onZoom: (delta: number) => void
   onReset: () => void
   onEventSelect: (event: MatchAnalysis["timeline"][number]) => void
+  onPlayerSelect: (playerId: string) => void
 }) {
   const showFlightPath = visibleLayers.includes("flightPath")
   const showTrajectory = visibleLayers.includes("trajectory")
@@ -1160,8 +1183,21 @@ function ReplayMap({
                   : teamMarkerColor(player.teamId)
               const teamLabel =
                 player.teamId === undefined ? "?" : String(player.teamId)
+              const health = healthPercentage(states.get(playerIndex)?.[4])
+              const healthRingRadius = radius * 1.18
+              const healthCircumference = 2 * Math.PI * healthRingRadius
+              const healthArc =
+                health === undefined ? 0 : healthCircumference * (health / 100)
               return (
-                <g key={player.id}>
+                <g
+                  key={player.id}
+                  style={{ cursor: "pointer" }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onPlayerSelect(player.id)
+                  }}
+                >
                   <title>
                     {player.name} · 队 {teamLabel} · {statusLabels[status]}
                   </title>
@@ -1221,6 +1257,34 @@ function ReplayMap({
                     stroke="var(--background)"
                     strokeWidth={Math.max(bounds.width / 500000, 2)}
                   />
+                  {health !== undefined ? (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={healthRingRadius}
+                      fill="none"
+                      stroke="var(--background)"
+                      strokeOpacity="0.65"
+                      strokeWidth={Math.max(bounds.width / 220000, 4)}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : null}
+                  {health !== undefined && healthArc > 0 ? (
+                    <circle
+                      cx={x}
+                      cy={y}
+                      r={healthRingRadius}
+                      fill="none"
+                      stroke={healthColor(health)}
+                      strokeWidth={Math.max(bounds.width / 220000, 4)}
+                      strokeDasharray={
+                        healthArc + " " + (healthCircumference - healthArc)
+                      }
+                      strokeLinecap="round"
+                      transform={"rotate(-90 " + x + " " + y + ")"}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ) : null}
                   <text
                     x={x}
                     y={y + Math.max(bounds.width / 360 / markerZoomFactor, 5)}
@@ -1416,6 +1480,17 @@ function ReplayMap({
 
 type RosterFilter = "all" | ReplayPlayerStatus | "unknown"
 
+type RosterPlayer = {
+  participant: MatchSummary["participants"][number] | undefined
+  player: MatchAnalysis["replayPlayers"][number]
+}
+
+type RosterTeam = {
+  key: string
+  teamId: number | undefined
+  players: RosterPlayer[]
+}
+
 const rosterFilterLabels: Record<RosterFilter, string> = {
   all: "全部",
   alive: "存活",
@@ -1431,6 +1506,44 @@ function matchesRosterFilter(
   if (filter === "all") return true
   if (filter === "unknown") return state === undefined
   return state?.[3] === filter
+}
+
+function getRosterTeamKey(teamId: number | undefined) {
+  return teamId === undefined ? "unknown" : String(teamId)
+}
+
+function rosterTeamLabel(teamId: number | undefined) {
+  return teamId === undefined ? "未分组" : "队 " + teamId
+}
+
+function rosterTeamStateSummary(
+  players: RosterPlayer[],
+  indexById: Map<string, number>,
+  states: Map<number, ReplayFramePlayer>
+) {
+  const counts = {
+    alive: 0,
+    knocked: 0,
+    dead: 0,
+    unknown: 0,
+  }
+  for (const { player } of players) {
+    const playerIndex = indexById.get(player.id)
+    const state =
+      playerIndex === undefined ? undefined : states.get(playerIndex)
+    if (!state) {
+      counts.unknown += 1
+    } else {
+      counts[state[3]] += 1
+    }
+  }
+  const summary = [
+    counts.alive ? counts.alive + " 存活" : null,
+    counts.knocked ? counts.knocked + " 倒地" : null,
+    counts.dead ? counts.dead + " 淘汰" : null,
+    counts.unknown ? counts.unknown + " 未定位" : null,
+  ].filter(Boolean)
+  return summary.length ? summary.join(" · ") : "等待状态"
 }
 
 function Roster({
@@ -1462,7 +1575,7 @@ function Roster({
   const participantsById = new Map(
     match.participants.map((participant) => [participant.id, participant])
   )
-  const visiblePlayers = [
+  const visiblePlayers: RosterPlayer[] = [
     ...match.participants.map((participant) => ({
       participant,
       player: {
@@ -1503,6 +1616,37 @@ function Roster({
   const telemetryOnlyCount = visiblePlayers.filter(
     ({ participant }) => participant === undefined
   ).length
+  const rosterTeams = filteredPlayers.reduce<RosterTeam[]>((groups, entry) => {
+    const teamId = entry.player.teamId
+    const key = getRosterTeamKey(teamId)
+    const group = groups.find((candidate) => candidate.key === key)
+    if (group) {
+      group.players.push(entry)
+    } else {
+      groups.push({ key, teamId, players: [entry] })
+    }
+    return groups
+  }, [])
+  rosterTeams.sort((left, right) => {
+    const leftHasTarget = left.players.some(
+      ({ player }) => player.id === analysis.playerId
+    )
+    const rightHasTarget = right.players.some(
+      ({ player }) => player.id === analysis.playerId
+    )
+    if (leftHasTarget !== rightHasTarget) return leftHasTarget ? -1 : 1
+    const leftRank = Math.min(
+      ...left.players.map(({ participant }) => participant?.rank ?? 999)
+    )
+    const rightRank = Math.min(
+      ...right.players.map(({ participant }) => participant?.rank ?? 999)
+    )
+    if (leftRank !== rightRank) return leftRank - rightRank
+    return (left.teamId ?? 999) - (right.teamId ?? 999)
+  })
+  const [collapsedTeams, setCollapsedTeams] = React.useState<Set<string>>(
+    () => new Set()
+  )
 
   return (
     <div className="rounded-xl border bg-card">
@@ -1524,7 +1668,7 @@ function Roster({
         ) : null}
         {analysis.replayFrames.length ? (
           <p className="text-xs text-muted-foreground">
-            列表状态表示各玩家最后一次遥测状态；官方存活人数以统计卡为准。
+            成员击杀和伤害按当前回放时间累计；没有位置数据的玩家显示官方最终摘要。
           </p>
         ) : null}
         <Input
@@ -1551,72 +1695,186 @@ function Roster({
           ))}
         </ToggleGroup>
         <p className="text-xs text-muted-foreground">
-          显示 {filteredPlayers.length} / {visiblePlayers.length} 名玩家
+          显示 {filteredPlayers.length} / {visiblePlayers.length} 名玩家 ·{" "}
+          {rosterTeams.length} 个战队
         </p>
       </div>
       <div className="max-h-[25rem] overflow-y-auto p-2">
-        {filteredPlayers.length ? (
-          filteredPlayers.map(({ player, participant }) => {
-            const playerIndex = indexById.get(player.id)
-            const state =
-              playerIndex === undefined ? undefined : states.get(playerIndex)
-            const vehicle =
-              playerIndex === undefined ? undefined : vehicles.get(playerIndex)
-            const isTarget = player.id === analysis.playerId
-            const isSelected = player.id === selectedPlayerId
-            const isTelemetryOnly = participant === undefined
+        {rosterTeams.length ? (
+          rosterTeams.map((team) => {
+            const isCollapsed = collapsedTeams.has(team.key)
+            const teamKills = team.players.reduce(
+              (total, { player, participant }) => {
+                const playerIndex = indexById.get(player.id)
+                const state =
+                  playerIndex === undefined
+                    ? undefined
+                    : states.get(playerIndex)
+                return (
+                  total + (state ? (state[5] ?? 0) : (participant?.kills ?? 0))
+                )
+              },
+              0
+            )
+            const teamDamage = team.players.reduce(
+              (total, { player, participant }) => {
+                const playerIndex = indexById.get(player.id)
+                const state =
+                  playerIndex === undefined
+                    ? undefined
+                    : states.get(playerIndex)
+                return (
+                  total + (state ? (state[6] ?? 0) : (participant?.damage ?? 0))
+                )
+              },
+              0
+            )
             return (
-              <Button
-                key={player.id}
-                type="button"
-                variant={isSelected ? "secondary" : "ghost"}
-                className="h-auto w-full justify-start gap-2 rounded-lg px-2 py-2 text-sm"
-                aria-pressed={isSelected}
-                onClick={() => onSelect(player.id)}
+              <section
+                key={team.key}
+                className="mb-2 overflow-hidden rounded-lg border last:mb-0"
+                data-roster-team={team.key}
               >
-                <span
-                  className="size-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: state
-                      ? player.teamId === undefined
-                        ? statusColors[state[3]]
-                        : teamMarkerColor(player.teamId)
-                      : player.teamId === undefined
-                        ? "var(--muted-foreground)"
-                        : teamMarkerColor(player.teamId),
-                  }}
-                />
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {player.name}
-                </span>
-                {isTarget ? <Badge variant="secondary">目标</Badge> : null}
-                {isTelemetryOnly ? (
-                  <Badge variant="outline">仅遥测</Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto w-full justify-start gap-2 rounded-none px-2 py-2 text-left"
+                  aria-expanded={!isCollapsed}
+                  aria-label={"切换" + rosterTeamLabel(team.teamId) + "成员"}
+                  onClick={() =>
+                    setCollapsedTeams((current) => {
+                      const next = new Set(current)
+                      if (next.has(team.key)) next.delete(team.key)
+                      else next.add(team.key)
+                      return next
+                    })
+                  }
+                >
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: teamMarkerColor(team.teamId),
+                    }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold">
+                      {rosterTeamLabel(team.teamId)}
+                    </span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {team.players.length} 人 ·{" "}
+                      {rosterTeamStateSummary(team.players, indexById, states)}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span title="战队击杀">K {teamKills}</span>
+                    <span title="战队伤害">D {Math.round(teamDamage)}</span>
+                  </span>
+                  <ChevronDownIcon
+                    className={cn(
+                      "size-3.5 shrink-0 transition-transform",
+                      isCollapsed ? "-rotate-90" : ""
+                    )}
+                  />
+                </Button>
+                {!isCollapsed ? (
+                  <div className="border-t p-1">
+                    {team.players.map(({ player, participant }) => {
+                      const playerIndex = indexById.get(player.id)
+                      const state =
+                        playerIndex === undefined
+                          ? undefined
+                          : states.get(playerIndex)
+                      const vehicle =
+                        playerIndex === undefined
+                          ? undefined
+                          : vehicles.get(playerIndex)
+                      const isTarget = player.id === analysis.playerId
+                      const isSelected = player.id === selectedPlayerId
+                      const isTelemetryOnly = participant === undefined
+                      const health = healthPercentage(state?.[4])
+                      const currentKills = state
+                        ? (state[5] ?? 0)
+                        : participant?.kills
+                      const currentDamage = state
+                        ? (state[6] ?? 0)
+                        : participant?.damage
+                      return (
+                        <Button
+                          key={player.id}
+                          type="button"
+                          variant={isSelected ? "secondary" : "ghost"}
+                          className="h-auto w-full justify-start gap-2 rounded-lg px-2 py-2 text-sm"
+                          aria-pressed={isSelected}
+                          onClick={() => onSelect(player.id)}
+                        >
+                          <span
+                            className="size-2 shrink-0 rounded-full"
+                            style={{
+                              backgroundColor: state
+                                ? player.teamId === undefined
+                                  ? statusColors[state[3]]
+                                  : teamMarkerColor(player.teamId)
+                                : player.teamId === undefined
+                                  ? "var(--muted-foreground)"
+                                  : teamMarkerColor(player.teamId),
+                            }}
+                          />
+                          <span className="min-w-0 flex-1 text-left">
+                            <span className="block truncate font-medium">
+                              {player.name}
+                            </span>
+                            <span className="block truncate text-[10px] text-muted-foreground">
+                              {currentKills !== undefined
+                                ? currentKills +
+                                  " 击杀 · " +
+                                  Math.round(currentDamage ?? 0) +
+                                  " 伤害"
+                                : "仅遥测玩家"}
+                              {health !== undefined
+                                ? " · " + Math.round(health) + "% 生命"
+                                : ""}
+                            </span>
+                          </span>
+                          {isTarget ? (
+                            <Badge variant="secondary">目标</Badge>
+                          ) : null}
+                          {isTelemetryOnly ? (
+                            <Badge variant="outline">仅遥测</Badge>
+                          ) : null}
+                          {player.teamId !== undefined ? (
+                            <Badge
+                              variant={
+                                player.teamId === targetTeamId
+                                  ? "secondary"
+                                  : "outline"
+                              }
+                            >
+                              队 {player.teamId}
+                            </Badge>
+                          ) : null}
+                          {vehicle ? (
+                            <Badge
+                              variant="outline"
+                              title={vehicle.vehicleType}
+                            >
+                              载具
+                            </Badge>
+                          ) : null}
+                          <span className="text-xs text-muted-foreground">
+                            {state
+                              ? statusLabels[state[3]]
+                              : playerIndex !== undefined
+                                ? "等待定位"
+                                : participant?.rank
+                                  ? `第 ${participant.rank} 名`
+                                  : "无位置数据"}
+                          </span>
+                        </Button>
+                      )
+                    })}
+                  </div>
                 ) : null}
-                {player.teamId !== undefined ? (
-                  <Badge
-                    variant={
-                      player.teamId === targetTeamId ? "secondary" : "outline"
-                    }
-                  >
-                    队 {player.teamId}
-                  </Badge>
-                ) : null}
-                {vehicle ? (
-                  <Badge variant="outline" title={vehicle.vehicleType}>
-                    载具
-                  </Badge>
-                ) : null}
-                <span className="text-xs text-muted-foreground">
-                  {state
-                    ? statusLabels[state[3]]
-                    : playerIndex !== undefined
-                      ? "等待定位"
-                      : participant?.rank
-                        ? `第 ${participant.rank} 名`
-                        : "无位置数据"}
-                </span>
-              </Button>
+              </section>
             )
           })
         ) : (
@@ -2505,6 +2763,7 @@ export function MatchReplay({
                   setMapScale(MAP_ZOOM_MIN)
                   setMapPan({ x: 0, y: 0 })
                 }}
+                onPlayerSelect={setSelectedPlayerId}
                 onEventSelect={(event) => {
                   setPlaying(false)
                   setTime(event.elapsedSeconds ?? 0)
