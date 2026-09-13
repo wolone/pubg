@@ -43,6 +43,7 @@ import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { StatCard } from "@/components/pubg/stat-card"
+import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -1955,11 +1956,13 @@ function ReplayHud({
 function ReplayEventMarkers({
   events,
   duration,
+  currentTime,
   visibleKinds,
   onSeek,
 }: {
   events: MatchAnalysis["timeline"]
   duration: number
+  currentTime: number
   visibleKinds: ReplayTimelineLayer[]
   onSeek: (seconds: number) => void
 }) {
@@ -2011,11 +2014,18 @@ function ReplayEventMarkers({
                   ? "secondary"
                   : "outline"
             }
-            className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+            className={cn(
+              "pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full",
+              Math.abs(seconds - currentTime) <= 0.5 &&
+                "ring-2 ring-ring ring-offset-1"
+            )}
             style={{
               left: `${position}%`,
               top: `calc(50% + ${markerLaneOffsets[lane]}px)`,
             }}
+            aria-current={
+              Math.abs(seconds - currentTime) <= 0.5 ? "time" : undefined
+            }
             aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
             onClick={() => onSeek(seconds)}
           >
@@ -2387,6 +2397,7 @@ export function MatchReplay({
                         <ReplayEventMarkers
                           events={analysis.timeline}
                           duration={duration}
+                          currentTime={currentTime}
                           visibleKinds={visibleTimelineLayers}
                           onSeek={(seconds) => {
                             setPlaying(false)
