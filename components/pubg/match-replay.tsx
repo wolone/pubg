@@ -240,6 +240,10 @@ function interpolateZones(
   }
 }
 
+function isReplayZoneActive(frame: ReplayFrame) {
+  return frame.phase === undefined || frame.phase >= 1
+}
+
 function frameAtTime(frame: ReplayFrame, elapsedSeconds: number) {
   if (frame.elapsedSeconds === elapsedSeconds) return frame
   return { ...frame, elapsedSeconds }
@@ -689,9 +693,14 @@ function ReplayMap({
     return analysis.replayFrames.length === 0 ? path : ""
   }, [analysis.replayFrames, currentFrame, path, targetIndex, visibleTime])
   const trackedPathPointCount = trackedPath ? trackedPath.split(" ").length : 0
-  const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(Boolean)
-  const firstZoneFrame = analysis.replayFrames.find((frame) =>
-    Object.values(frame.zones ?? {}).some(Boolean)
+  const currentZones =
+    currentFrame && isReplayZoneActive(currentFrame)
+      ? currentFrame.zones
+      : undefined
+  const hasCurrentZones = Object.values(currentZones ?? {}).some(Boolean)
+  const firstZoneFrame = analysis.replayFrames.find(
+    (frame) =>
+      isReplayZoneActive(frame) && Object.values(frame.zones ?? {}).some(Boolean)
   )
   const visibleKills = analysis.timeline.filter(
     (kill) =>
@@ -887,13 +896,13 @@ function ReplayMap({
               ) : null}
             </g>
           ) : null}
-          {showZones && currentFrame?.zones?.redzone ? (
+          {showZones && currentZones?.redzone ? (
             <g>
               <title>红区</title>
               <circle
-                cx={currentFrame.zones.redzone.x}
-                cy={currentFrame.zones.redzone.y}
-                r={currentFrame.zones.redzone.radius}
+                cx={currentZones.redzone.x}
+                cy={currentZones.redzone.y}
+                r={currentZones.redzone.radius}
                 fill="none"
                 stroke="#ef4444"
                 strokeOpacity="0.9"
@@ -903,13 +912,13 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {showZones && currentFrame?.zones?.blackzone ? (
+          {showZones && currentZones?.blackzone ? (
             <g>
               <title>特殊区</title>
               <circle
-                cx={currentFrame.zones.blackzone.x}
-                cy={currentFrame.zones.blackzone.y}
-                r={currentFrame.zones.blackzone.radius}
+                cx={currentZones.blackzone.x}
+                cy={currentZones.blackzone.y}
+                r={currentZones.blackzone.radius}
                 fill="none"
                 stroke="#a855f7"
                 strokeOpacity="0.85"
@@ -919,13 +928,13 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {showZones && currentFrame?.zones?.bluezone ? (
+          {showZones && currentZones?.bluezone ? (
             <g>
               <title>蓝圈</title>
               <circle
-                cx={currentFrame.zones.bluezone.x}
-                cy={currentFrame.zones.bluezone.y}
-                r={currentFrame.zones.bluezone.radius}
+                cx={currentZones.bluezone.x}
+                cy={currentZones.bluezone.y}
+                r={currentZones.bluezone.radius}
                 fill="none"
                 stroke="#60a5fa"
                 strokeOpacity="0.95"
@@ -934,13 +943,13 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {showZones && currentFrame?.zones?.safezone ? (
+          {showZones && currentZones?.safezone ? (
             <g>
               <title>白圈</title>
               <circle
-                cx={currentFrame.zones.safezone.x}
-                cy={currentFrame.zones.safezone.y}
-                r={currentFrame.zones.safezone.radius}
+                cx={currentZones.safezone.x}
+                cy={currentZones.safezone.y}
+                r={currentZones.safezone.radius}
                 fill="none"
                 stroke="#0f172a"
                 strokeOpacity="0.7"
@@ -948,9 +957,9 @@ function ReplayMap({
                 vectorEffect="non-scaling-stroke"
               />
               <circle
-                cx={currentFrame.zones.safezone.x}
-                cy={currentFrame.zones.safezone.y}
-                r={currentFrame.zones.safezone.radius}
+                cx={currentZones.safezone.x}
+                cy={currentZones.safezone.y}
+                r={currentZones.safezone.radius}
                 fill="none"
                 stroke="#ffffff"
                 strokeOpacity="0.98"
@@ -1557,6 +1566,7 @@ function getReplayZoneMarkers(frames: ReplayFrame[]) {
 
   for (const frame of frames) {
     if (!frame.zones) continue
+    if (!isReplayZoneActive(frame)) continue
     const phaseKey = frame.phase === undefined ? "unknown" : String(frame.phase)
     if (
       phaseKey === previousPhaseKey ||
