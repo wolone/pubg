@@ -890,6 +890,7 @@ export function ReplayMap({
                 const isFlying = event.type.includes("Spawn")
                 const width = screenToMap(18)
                 const height = screenToMap(isFlying ? 32 : 17)
+                const anchorOffset = screenToMap(isFlying ? 23 : 8)
                 return (
                   <g key={`care-package-${event.timestamp}-${index}`}>
                     <title>{event.message}</title>
@@ -900,7 +901,7 @@ export function ReplayMap({
                           : CARE_PACKAGE_ASSET_PATHS.normal
                       }
                       x={point.x - width / 2}
-                      y={point.y - height + screenToMap(2)}
+                      y={point.y - anchorOffset}
                       width={width}
                       height={height}
                       preserveAspectRatio="xMidYMid meet"
