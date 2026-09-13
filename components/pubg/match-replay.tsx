@@ -556,7 +556,7 @@ function ReplayMap({
                 <polyline
                   points={flightPath}
                   fill="none"
-                  stroke="var(--chart-5)"
+                  stroke="#f59e0b"
                   strokeOpacity="0.9"
                   strokeWidth={Math.max(bounds.width / 240000, 3)}
                   strokeDasharray={`${Math.max(bounds.width / 90000, 10)} ${Math.max(bounds.width / 70000, 8)}`}
@@ -568,7 +568,7 @@ function ReplayMap({
                 cx={analysis.flightPath[0]!.x}
                 cy={analysis.flightPath[0]!.y}
                 r={Math.max(bounds.width / 170, 8)}
-                fill="var(--chart-5)"
+                fill="#f59e0b"
                 fillOpacity="0.95"
                 stroke="var(--background)"
                 strokeWidth={Math.max(bounds.width / 500000, 2)}
@@ -579,7 +579,7 @@ function ReplayMap({
                   cy={analysis.flightPath.at(-1)!.y}
                   r={Math.max(bounds.width / 170, 8)}
                   fill="var(--background)"
-                  stroke="var(--chart-5)"
+                  stroke="#f59e0b"
                   strokeWidth={Math.max(bounds.width / 300000, 3)}
                 />
               ) : null}
@@ -592,11 +592,11 @@ function ReplayMap({
                 cx={currentFrame.zones.redzone.x}
                 cy={currentFrame.zones.redzone.y}
                 r={currentFrame.zones.redzone.radius}
-                fill="var(--destructive)"
-                fillOpacity="0.08"
-                stroke="var(--destructive)"
-                strokeOpacity="0.65"
-                strokeWidth={Math.max(bounds.width / 300000, 2)}
+                fill="#ef4444"
+                fillOpacity="0.14"
+                stroke="#ef4444"
+                strokeOpacity="0.9"
+                strokeWidth={Math.max(bounds.width / 260000, 3)}
                 strokeDasharray={`${Math.max(bounds.width / 100000, 6)} ${Math.max(bounds.width / 70000, 8)}`}
               />
             </g>
@@ -608,11 +608,11 @@ function ReplayMap({
                 cx={currentFrame.zones.blackzone.x}
                 cy={currentFrame.zones.blackzone.y}
                 r={currentFrame.zones.blackzone.radius}
-                fill="var(--foreground)"
-                fillOpacity="0.08"
-                stroke="var(--foreground)"
-                strokeOpacity="0.55"
-                strokeWidth={Math.max(bounds.width / 300000, 2)}
+                fill="#a855f7"
+                fillOpacity="0.1"
+                stroke="#a855f7"
+                strokeOpacity="0.85"
+                strokeWidth={Math.max(bounds.width / 260000, 3)}
                 strokeDasharray={`${Math.max(bounds.width / 80000, 6)} ${Math.max(bounds.width / 50000, 10)}`}
               />
             </g>
@@ -624,11 +624,11 @@ function ReplayMap({
                 cx={currentFrame.zones.bluezone.x}
                 cy={currentFrame.zones.bluezone.y}
                 r={currentFrame.zones.bluezone.radius}
-                fill="var(--chart-2)"
-                fillOpacity="0.06"
-                stroke="var(--chart-2)"
-                strokeOpacity="0.75"
-                strokeWidth={Math.max(bounds.width / 320000, 2)}
+                fill="#3b82f6"
+                fillOpacity="0.1"
+                stroke="#3b82f6"
+                strokeOpacity="0.95"
+                strokeWidth={Math.max(bounds.width / 260000, 3)}
               />
             </g>
           ) : null}
@@ -640,9 +640,9 @@ function ReplayMap({
                 cy={currentFrame.zones.safezone.y}
                 r={currentFrame.zones.safezone.radius}
                 fill="none"
-                stroke="var(--foreground)"
-                strokeOpacity="0.8"
-                strokeWidth={Math.max(bounds.width / 320000, 2)}
+                stroke="#f8fafc"
+                strokeOpacity="0.95"
+                strokeWidth={Math.max(bounds.width / 260000, 3)}
                 strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 60000, 10)}`}
               />
             </g>
@@ -653,8 +653,8 @@ function ReplayMap({
               fill="none"
               stroke={
                 selectedPlayerId === analysis.playerId
-                  ? "var(--chart-1)"
-                  : "var(--chart-4)"
+                  ? "#22d3ee"
+                  : "#f59e0b"
               }
               strokeOpacity="0.45"
               strokeWidth={Math.max(bounds.width / 240000, 2)}
@@ -890,29 +890,29 @@ function ReplayMap({
       <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         {analysis.flightPath.length > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
-            <span className="h-0 w-4 border-t-2 border-dashed border-chart-5" />
+            <span className="h-0 w-4 border-t-2 border-dashed border-amber-400" />
             起始航线
           </span>
         ) : null}
         <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
-          <span className="h-0 w-4 border-t-2 border-chart-1" />
+          <span className="h-0 w-4 border-t-2 border-cyan-400" />
           运动轨迹：{selectedPlayer?.name ?? "已选玩家"}
         </span>
         <span className="inline-flex items-center gap-2 rounded-md border bg-background/85 px-2 py-1">
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full border border-chart-2" />
+            <span className="size-2 rounded-full border-2 border-blue-400 bg-blue-500/20" />
             蓝圈
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full border border-foreground" />
+            <span className="size-2 rounded-full border-2 border-slate-100" />
             白圈
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full bg-destructive" />
+            <span className="size-2 rounded-full bg-red-500" />
             红区
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full border border-foreground border-dashed" />
+            <span className="size-2 rounded-full border-2 border-dashed border-purple-400 bg-purple-500/20" />
             特殊区
           </span>
         </span>
