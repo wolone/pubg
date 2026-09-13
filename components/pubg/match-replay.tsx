@@ -346,12 +346,84 @@ function getBounds(analysis: MatchAnalysis, mapName: string) {
   }
 }
 
+type ReplayMapPoint = { x: number; y: number; z?: number }
+type ReplayMapBounds = {
+  minX: number
+  minY: number
+  width: number
+  height: number
+}
+
+function extendRayToBounds(
+  point: ReplayMapPoint,
+  direction: { x: number; y: number },
+  bounds: ReplayMapBounds
+) {
+  const maxX = bounds.minX + bounds.width
+  const maxY = bounds.minY + bounds.height
+  const candidates: number[] = []
+  const addCandidate = (distance: number) => {
+    if (!Number.isFinite(distance) || distance < 0) return
+    const x = point.x + direction.x * distance
+    const y = point.y + direction.y * distance
+    const epsilon = Math.max(bounds.width, bounds.height) * 1e-8
+    if (
+      x >= bounds.minX - epsilon &&
+      x <= maxX + epsilon &&
+      y >= bounds.minY - epsilon &&
+      y <= maxY + epsilon
+    ) {
+      candidates.push(distance)
+    }
+  }
+
+  if (direction.x > 0) addCandidate((maxX - point.x) / direction.x)
+  if (direction.x < 0) addCandidate((bounds.minX - point.x) / direction.x)
+  if (direction.y > 0) addCandidate((maxY - point.y) / direction.y)
+  if (direction.y < 0) addCandidate((bounds.minY - point.y) / direction.y)
+
+  const distance = Math.min(...candidates)
+  if (!Number.isFinite(distance)) return point
+  return {
+    x: point.x + direction.x * distance,
+    y: point.y + direction.y * distance,
+  }
+}
+
+function extendFlightPathToBounds(
+  points: ReplayMapPoint[],
+  bounds: ReplayMapBounds
+) {
+  if (points.length < 2) return points
+  const first = points[0]!
+  const second = points[1]!
+  const last = points.at(-1)!
+  const previous = points.at(-2)!
+  const extendedStart = extendRayToBounds(
+    first,
+    { x: first.x - second.x, y: first.y - second.y },
+    bounds
+  )
+  const extendedEnd = extendRayToBounds(
+    last,
+    { x: last.x - previous.x, y: last.y - previous.y },
+    bounds
+  )
+
+  return [
+    { ...first, ...extendedStart },
+    ...points.slice(1, -1),
+    { ...last, ...extendedEnd },
+  ]
+}
+
 function currentStates(frame: ReplayFrame | null) {
   return new Map(frame?.players.map((player) => [player[0], player]) ?? [])
 }
 
 type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
+type ReplayTimelineLayer = "events" | "zones"
 
 function ReplayMap({
   mapName,
@@ -407,9 +479,6 @@ function ReplayMap({
   const path = analysis.trajectory
     .map((point) => `${point.x},${point.y}`)
     .join(" ")
-  const flightPath = analysis.flightPath
-    .map((point) => `${point.x},${point.y}`)
-    .join(" ")
   const targetIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === analysis.playerId
   )
@@ -419,6 +488,13 @@ function ReplayMap({
   )
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
   const trackedPlayer = analysis.replayPlayers[targetIndex]
+  const flightPathPoints = React.useMemo(
+    () => extendFlightPathToBounds(analysis.flightPath, bounds),
+    [analysis.flightPath, bounds]
+  )
+  const extendedFlightPath = flightPathPoints
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ")
   const trackedPath = React.useMemo(() => {
     const framePath: string[] = []
     for (const frame of analysis.replayFrames) {
@@ -576,7 +652,7 @@ function ReplayMap({
               <title>起始航线</title>
               {analysis.flightPath.length > 1 ? (
                 <polyline
-                  points={flightPath}
+                  points={extendedFlightPath}
                   fill="none"
                   stroke="#f59e0b"
                   strokeOpacity="0.9"
@@ -588,8 +664,8 @@ function ReplayMap({
                 />
               ) : null}
               <circle
-                cx={analysis.flightPath[0]!.x}
-                cy={analysis.flightPath[0]!.y}
+                cx={flightPathPoints[0]!.x}
+                cy={flightPathPoints[0]!.y}
                 r={Math.max(bounds.width / 170, 8)}
                 fill="#f59e0b"
                 fillOpacity="0.95"
@@ -599,8 +675,8 @@ function ReplayMap({
               />
               {analysis.flightPath.length > 1 ? (
                 <circle
-                  cx={analysis.flightPath.at(-1)!.x}
-                  cy={analysis.flightPath.at(-1)!.y}
+                  cx={flightPathPoints.at(-1)!.x}
+                  cy={flightPathPoints.at(-1)!.y}
                   r={Math.max(bounds.width / 170, 8)}
                   fill="var(--background)"
                   stroke="#f59e0b"
@@ -1740,6 +1816,9 @@ export function MatchReplay({
     "zones",
     "events",
   ])
+  const [visibleTimelineLayers, setVisibleTimelineLayers] = React.useState<
+    ReplayTimelineLayer[]
+  >(["events", "zones"])
   const [selectedPlayerId, setSelectedPlayerId] = React.useState(
     analysis.playerId
   )
@@ -1944,6 +2023,28 @@ export function MatchReplay({
                         </Select>
                       </div>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        时间轴标记
+                      </span>
+                      <ToggleGroup
+                        multiple
+                        value={visibleTimelineLayers}
+                        onValueChange={(value) =>
+                          setVisibleTimelineLayers(
+                            value as ReplayTimelineLayer[]
+                          )
+                        }
+                        variant="outline"
+                        size="sm"
+                        aria-label="切换时间轴标记"
+                      >
+                        <ToggleGroupItem value="events">事件</ToggleGroupItem>
+                        <ToggleGroupItem value="zones">
+                          圈层阶段
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
                     <div className="relative py-4">
                       <Slider
                         value={[currentTime]}
@@ -1957,22 +2058,26 @@ export function MatchReplay({
                           )
                         }
                       />
-                      <ReplayEventMarkers
-                        events={analysis.timeline}
-                        duration={duration}
-                        onSeek={(seconds) => {
-                          setPlaying(false)
-                          setTime(seconds)
-                        }}
-                      />
-                      <ReplayZoneMarkers
-                        frames={analysis.replayFrames}
-                        duration={duration}
-                        onSeek={(seconds) => {
-                          setPlaying(false)
-                          setTime(seconds)
-                        }}
-                      />
+                      {visibleTimelineLayers.includes("events") ? (
+                        <ReplayEventMarkers
+                          events={analysis.timeline}
+                          duration={duration}
+                          onSeek={(seconds) => {
+                            setPlaying(false)
+                            setTime(seconds)
+                          }}
+                        />
+                      ) : null}
+                      {visibleTimelineLayers.includes("zones") ? (
+                        <ReplayZoneMarkers
+                          frames={analysis.replayFrames}
+                          duration={duration}
+                          onSeek={(seconds) => {
+                            setPlaying(false)
+                            setTime(seconds)
+                          }}
+                        />
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
