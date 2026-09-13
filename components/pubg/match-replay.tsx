@@ -450,6 +450,7 @@ function MapEventMarker({
     <g
       role="button"
       tabIndex={0}
+      data-map-event-marker="true"
       className="pointer-events-auto cursor-pointer"
       pointerEvents="all"
       aria-label={`打开事件 ${formatTime(event.elapsedSeconds ?? 0)}：${event.message}`}
@@ -611,6 +612,12 @@ function ReplayMap({
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
+    if (
+      event.target instanceof Element &&
+      event.target.closest("[data-map-event-marker]")
+    ) {
+      return
+    }
     panRef.current = {
       startX: event.clientX,
       startY: event.clientY,
