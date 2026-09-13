@@ -565,10 +565,11 @@ function ReplayMap({
                   fill="none"
                   stroke="#f59e0b"
                   strokeOpacity="0.9"
-                  strokeWidth={Math.max(bounds.width / 240000, 3)}
+                  strokeWidth={3}
                   strokeDasharray={`${Math.max(bounds.width / 90000, 10)} ${Math.max(bounds.width / 70000, 8)}`}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  vectorEffect="non-scaling-stroke"
                 />
               ) : null}
               <circle
@@ -579,6 +580,7 @@ function ReplayMap({
                 fillOpacity="0.95"
                 stroke="var(--background)"
                 strokeWidth={Math.max(bounds.width / 500000, 2)}
+                vectorEffect="non-scaling-stroke"
               />
               {analysis.flightPath.length > 1 ? (
                 <circle
@@ -587,7 +589,8 @@ function ReplayMap({
                   r={Math.max(bounds.width / 170, 8)}
                   fill="var(--background)"
                   stroke="#f59e0b"
-                  strokeWidth={Math.max(bounds.width / 300000, 3)}
+                  strokeWidth={3}
+                  vectorEffect="non-scaling-stroke"
                 />
               ) : null}
             </g>
@@ -603,8 +606,9 @@ function ReplayMap({
                 fillOpacity="0.14"
                 stroke="#ef4444"
                 strokeOpacity="0.9"
-                strokeWidth={Math.max(bounds.width / 260000, 3)}
+                strokeWidth={2.5}
                 strokeDasharray={`${Math.max(bounds.width / 100000, 6)} ${Math.max(bounds.width / 70000, 8)}`}
+                vectorEffect="non-scaling-stroke"
               />
             </g>
           ) : null}
@@ -619,8 +623,9 @@ function ReplayMap({
                 fillOpacity="0.1"
                 stroke="#a855f7"
                 strokeOpacity="0.85"
-                strokeWidth={Math.max(bounds.width / 260000, 3)}
+                strokeWidth={2.5}
                 strokeDasharray={`${Math.max(bounds.width / 80000, 6)} ${Math.max(bounds.width / 50000, 10)}`}
+                vectorEffect="non-scaling-stroke"
               />
             </g>
           ) : null}
@@ -632,10 +637,11 @@ function ReplayMap({
                 cy={currentFrame.zones.bluezone.y}
                 r={currentFrame.zones.bluezone.radius}
                 fill="#3b82f6"
-                fillOpacity="0.1"
-                stroke="#3b82f6"
+                fillOpacity="0.08"
+                stroke="#60a5fa"
                 strokeOpacity="0.95"
-                strokeWidth={Math.max(bounds.width / 260000, 3)}
+                strokeWidth={2.5}
+                vectorEffect="non-scaling-stroke"
               />
             </g>
           ) : null}
@@ -647,10 +653,21 @@ function ReplayMap({
                 cy={currentFrame.zones.safezone.y}
                 r={currentFrame.zones.safezone.radius}
                 fill="none"
-                stroke="#f8fafc"
-                strokeOpacity="0.95"
-                strokeWidth={Math.max(bounds.width / 260000, 3)}
-                strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 60000, 10)}`}
+                stroke="#0f172a"
+                strokeOpacity="0.7"
+                strokeWidth={7}
+                vectorEffect="non-scaling-stroke"
+              />
+              <circle
+                cx={currentFrame.zones.safezone.x}
+                cy={currentFrame.zones.safezone.y}
+                r={currentFrame.zones.safezone.radius}
+                fill="none"
+                stroke="#ffffff"
+                strokeOpacity="0.98"
+                strokeWidth={4}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
               />
             </g>
           ) : null}
@@ -662,10 +679,11 @@ function ReplayMap({
                 selectedPlayerId === analysis.playerId ? "#22d3ee" : "#f59e0b"
               }
               strokeOpacity="0.45"
-              strokeWidth={Math.max(bounds.width / 240000, 2)}
+              strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeDasharray={`${Math.max(bounds.width / 120000, 4)} ${Math.max(bounds.width / 180000, 6)}`}
+              vectorEffect="non-scaling-stroke"
             />
           ) : null}
           {showEvents
@@ -1592,8 +1610,7 @@ function ReplayZoneMarkers({
 
   for (const frame of frames) {
     if (!frame.zones) continue
-    const phaseKey =
-      frame.phase === undefined ? "unknown" : String(frame.phase)
+    const phaseKey = frame.phase === undefined ? "unknown" : String(frame.phase)
     if (phaseKey === previousPhaseKey) continue
     markers.push(frame)
     previousPhaseKey = phaseKey
