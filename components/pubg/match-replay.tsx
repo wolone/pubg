@@ -1582,6 +1582,30 @@ function matchesTimelineFilter(
   )
 }
 
+type ReplayNavigationNode =
+  { kind: "event"; seconds: number } | { kind: "zone"; seconds: number }
+
+function getReplayNavigationNodes(
+  events: MatchAnalysis["timeline"],
+  zoneMarkers: ReplayFrame[],
+  showZones: boolean
+) {
+  const nodes: ReplayNavigationNode[] = events.flatMap((event) =>
+    event.elapsedSeconds === undefined
+      ? []
+      : [{ kind: "event" as const, seconds: event.elapsedSeconds }]
+  )
+  if (showZones) {
+    nodes.push(
+      ...zoneMarkers.map((frame) => ({
+        kind: "zone" as const,
+        seconds: frame.elapsedSeconds,
+      }))
+    )
+  }
+  return nodes.sort((left, right) => left.seconds - right.seconds)
+}
+
 function ReplayTimeline({
   events,
   currentTime,
@@ -1623,12 +1647,17 @@ function ReplayTimeline({
         : result,
     -1
   )
-  const nextEvent = filteredEvents.find(
-    (event) => (event.elapsedSeconds ?? 0) > currentTime + 0.05
+  const navigationNodes = getReplayNavigationNodes(
+    filteredEvents,
+    zoneMarkers,
+    visibleKinds.includes("zones")
   )
-  const previousEvent = [...filteredEvents]
+  const nextNode = navigationNodes.find(
+    (node) => node.seconds > currentTime + 0.05
+  )
+  const previousNode = [...navigationNodes]
     .reverse()
-    .find((event) => (event.elapsedSeconds ?? 0) < currentTime - 0.05)
+    .find((node) => node.seconds < currentTime - 0.05)
 
   return (
     <>
@@ -1659,25 +1688,28 @@ function ReplayTimeline({
             <Button
               size="sm"
               variant="outline"
-              disabled={!previousEvent}
-              onClick={() => onSeek(previousEvent?.elapsedSeconds ?? 0)}
+              disabled={!previousNode}
+              onClick={() => onSeek(previousNode?.seconds ?? 0)}
             >
               <ArrowLeftIcon data-icon="inline-start" />
-              上一事件
+              上一节点
             </Button>
             <Button
               size="sm"
               variant="outline"
-              disabled={!nextEvent}
-              onClick={() => onSeek(nextEvent?.elapsedSeconds ?? 0)}
+              disabled={!nextNode}
+              onClick={() => onSeek(nextNode?.seconds ?? 0)}
             >
-              下一事件
+              下一节点
               <ArrowRightIcon data-icon="inline-end" />
             </Button>
             <Badge variant="outline">
               {filteredEvents.length === events.length
                 ? `${events.length} 个事件`
                 : `${filteredEvents.length} / ${events.length} 个事件`}
+              {visibleKinds.includes("zones") && zoneMarkers.length
+                ? ` · ${zoneMarkers.length} 个圈层节点`
+                : ""}
             </Badge>
           </div>
         </div>
