@@ -966,6 +966,7 @@ function replayZoneOf(position: unknown, radius: unknown) {
 
 function sampleFrameTimes(values: number[], count: number) {
   if (values.length <= count) return values
+  if (count === 1) return [values[Math.floor((values.length - 1) / 2)]!]
   return Array.from({ length: count }, (_, index) => {
     const position = Math.round((index * (values.length - 1)) / (count - 1))
     return values[position]!
@@ -996,16 +997,14 @@ function selectFrameTimes(
     }
   }
 
-  const availableAfterBounds = Math.max(0, count - selected.size)
-  if (criticalTimes.length > availableAfterBounds) {
-    add(criticalTimes, availableAfterBounds)
-  } else {
-    add(criticalTimes, criticalTimes.length)
-    const remainingAfterCritical = Math.max(0, count - selected.size)
-    add(supportingTimes, remainingAfterCritical)
-    const remainingAfterSupporting = Math.max(0, count - selected.size)
-    add(regularTimes, remainingAfterSupporting)
-  }
+  // Keep the regular time grid as the playback backbone. Supporting points
+  // can be numerous (for example, airborne positions from every player) and
+  // must not remove the intervals needed for continuous interpolation.
+  add(regularTimes, count)
+  const remainingAfterRegular = Math.max(0, count - selected.size)
+  add(criticalTimes, remainingAfterRegular)
+  const remainingAfterCritical = Math.max(0, count - selected.size)
+  add(supportingTimes, remainingAfterCritical)
 
   if (selected.size < count) {
     add(

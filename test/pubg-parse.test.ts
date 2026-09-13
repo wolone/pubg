@@ -1361,6 +1361,46 @@ describe("PUBG JSON:API parser", () => {
     ).toBe(true)
   })
 
+  it("keeps regular playback intervals when supporting points are concentrated", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.target",
+            location: { x: 100, y: 200 },
+          },
+        },
+        ...Array.from({ length: 500 }, (_, index) => ({
+          _T: "LogPlayerPosition",
+          elapsedTime: index / 25,
+          character: {
+            accountId: "account.airborne",
+            location: { x: 300 + index, y: 400 + index, z: 30_000 },
+          },
+        })),
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 1_000,
+          character: {
+            accountId: "account.target",
+            location: { x: 1_100, y: 1_200 },
+          },
+        },
+      ],
+      "account.target",
+      "match-regular-grid"
+    )
+
+    const frameTimes = analysis.replayFrames.map((frame) => frame.elapsedSeconds)
+    expect(frameTimes.every((time) => Number.isFinite(time))).toBe(true)
+    const maximumGap = Math.max(
+      ...frameTimes.slice(1).map((time, index) => time - frameTimes[index]!)
+    )
+    expect(maximumGap).toBeLessThanOrEqual(3)
+  })
+
   it("attributes LogPlayerKillV2 to the final finisher", () => {
     const analysis = parseTelemetry(
       [
