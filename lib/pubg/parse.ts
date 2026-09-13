@@ -258,7 +258,8 @@ export function parseTelemetry(
   raw: unknown,
   playerId: string,
   matchId: string,
-  participants: MatchParticipant[] = []
+  participants: MatchParticipant[] = [],
+  matchDurationSeconds?: number
 ): {
   matchId: string
   playerId: string
@@ -286,13 +287,30 @@ export function parseTelemetry(
   const participantIdsByName = new Map(
     participants.map((participant) => [participant.name, participant.id])
   )
-  const eventTimes = events
-    .filter((item): item is Record<string, unknown> =>
+  const eventRecords = events.filter(
+    (item): item is Record<string, unknown> =>
       Boolean(item && typeof item === "object")
-    )
+  )
+  const eventTimes = eventRecords
     .map((event) => timestampOf(event))
     .filter((value): value is number => value !== null)
-  const replayStartMs = eventTimes.length ? Math.min(...eventTimes) : null
+  const matchStartMs =
+    eventRecords
+      .filter(
+        (event) =>
+          stringValue(event._T, stringValue(event.type, "")) ===
+          "LogMatchStart"
+      )
+      .map((event) => timestampOf(event))
+      .find((value): value is number => value !== null) ?? null
+  const replayStartMs =
+    matchStartMs ?? (eventTimes.length ? Math.min(...eventTimes) : null)
+  const replayLimitSeconds =
+    typeof matchDurationSeconds === "number" &&
+    Number.isFinite(matchDurationSeconds) &&
+    matchDurationSeconds > 0
+      ? matchDurationSeconds
+      : null
 
   for (const participant of participants) {
     replayPlayersById.set(participant.id, {
@@ -307,6 +325,14 @@ export function parseTelemetry(
   for (const [eventIndex, item] of events.entries()) {
     if (!item || typeof item !== "object") continue
     const event = item as Record<string, unknown>
+    const eventTimestampMs = timestampOf(event)
+    if (
+      matchStartMs !== null &&
+      eventTimestampMs !== null &&
+      eventTimestampMs < matchStartMs
+    ) {
+      continue
+    }
     const type = stringValue(
       event._T,
       stringValue(event.type, "TelemetryEvent")
@@ -327,6 +353,12 @@ export function parseTelemetry(
       locationOf(itemPackage?.location) ??
       locationOf(event.location)
     const elapsedSeconds = elapsedTimeOf(event, replayStartMs, eventIndex)
+    if (
+      replayLimitSeconds !== null &&
+      elapsedSeconds > replayLimitSeconds
+    ) {
+      continue
+    }
     const characterName = stringValue(character?.name, "")
     const attackerName = stringValue(attacker?.name, "")
     const victimName = stringValue(victim?.name, "")

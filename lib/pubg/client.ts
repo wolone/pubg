@@ -166,7 +166,13 @@ export async function getMatchAnalysis(
   }
   const telemetry = (await telemetryResponse.json()) as unknown
   return {
-    ...parseTelemetry(telemetry, playerId, matchId, match.participants),
+    ...parseTelemetry(
+      telemetry,
+      playerId,
+      matchId,
+      match.participants,
+      match.durationSeconds
+    ),
     source: "api",
   }
 }

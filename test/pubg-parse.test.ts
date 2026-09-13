@@ -959,6 +959,70 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("uses match start as the timestamp origin and ignores pre-match events", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogItemEquip",
+          _D: "2026-09-12T09:59:00Z",
+          character: {
+            accountId: "account.123",
+            location: { x: 10, y: 10 },
+          },
+        },
+        { _T: "LogMatchStart", _D: "2026-09-12T10:00:00Z" },
+        {
+          _T: "LogPlayerPosition",
+          _D: "2026-09-12T10:00:10Z",
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 100 },
+          },
+        },
+      ],
+      "account.123",
+      "match-time-origin"
+    )
+
+    expect(analysis.trajectory).toEqual([
+      { x: 100, y: 100, elapsedSeconds: 10 },
+    ])
+    expect(analysis.replayDurationSeconds).toBe(10)
+  })
+
+  it("does not extend replay past the official match duration", () => {
+    const analysis = parseTelemetry(
+      [
+        { _T: "LogMatchStart", _D: "2026-09-12T10:00:00Z" },
+        {
+          _T: "LogPlayerPosition",
+          _D: "2026-09-12T10:00:10Z",
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 100 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          _D: "2026-09-12T10:00:31Z",
+          character: {
+            accountId: "account.123",
+            location: { x: 300, y: 300 },
+          },
+        },
+      ],
+      "account.123",
+      "match-duration-limit",
+      [],
+      20
+    )
+
+    expect(analysis.trajectory).toEqual([
+      { x: 100, y: 100, elapsedSeconds: 10 },
+    ])
+    expect(analysis.replayDurationSeconds).toBe(10)
+  })
+
   it("stops the flight path when aircraft telemetry jumps after the drop", () => {
     const analysis = parseTelemetry(
       [
