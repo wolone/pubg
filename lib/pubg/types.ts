@@ -140,6 +140,7 @@ export interface MatchAnalysis {
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
+  flightPath: Array<{ x: number; y: number; z?: number }>
   replayPlayers: ReplayPlayer[]
   replayFrames: ReplayFrame[]
   replayDurationSeconds: number

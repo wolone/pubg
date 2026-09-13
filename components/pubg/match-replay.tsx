@@ -296,6 +296,7 @@ function getBounds(analysis: MatchAnalysis, mapName: string) {
 
   const points = [
     ...analysis.trajectory,
+    ...analysis.flightPath,
     ...analysis.replayFrames.flatMap((frame) =>
       frame.players.map(([, x, y]) => ({ x, y }))
     ),
@@ -368,6 +369,9 @@ function ReplayMap({
     [currentFrame]
   )
   const path = analysis.trajectory
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ")
+  const flightPath = analysis.flightPath
     .map((point) => `${point.x},${point.y}`)
     .join(" ")
   const targetIndex = analysis.replayPlayers.findIndex(
@@ -539,6 +543,42 @@ function ReplayMap({
             strokeOpacity="0.2"
             strokeWidth={Math.max(bounds.width / 816000, 1)}
           />
+          {analysis.flightPath.length > 0 ? (
+            <g>
+              <title>起始航线</title>
+              {analysis.flightPath.length > 1 ? (
+                <polyline
+                  points={flightPath}
+                  fill="none"
+                  stroke="var(--chart-5)"
+                  strokeOpacity="0.9"
+                  strokeWidth={Math.max(bounds.width / 240000, 3)}
+                  strokeDasharray={`${Math.max(bounds.width / 90000, 10)} ${Math.max(bounds.width / 70000, 8)}`}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : null}
+              <circle
+                cx={analysis.flightPath[0]!.x}
+                cy={analysis.flightPath[0]!.y}
+                r={Math.max(bounds.width / 170, 8)}
+                fill="var(--chart-5)"
+                fillOpacity="0.95"
+                stroke="var(--background)"
+                strokeWidth={Math.max(bounds.width / 500000, 2)}
+              />
+              {analysis.flightPath.length > 1 ? (
+                <circle
+                  cx={analysis.flightPath.at(-1)!.x}
+                  cy={analysis.flightPath.at(-1)!.y}
+                  r={Math.max(bounds.width / 170, 8)}
+                  fill="var(--background)"
+                  stroke="var(--chart-5)"
+                  strokeWidth={Math.max(bounds.width / 300000, 3)}
+                />
+              ) : null}
+            </g>
+          ) : null}
           {currentFrame?.zones?.redzone ? (
             <circle
               cx={currentFrame.zones.redzone.x}
@@ -817,22 +857,28 @@ function ReplayMap({
         </div>
       </div>
       <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-        <span className="rounded-md border bg-background/85 px-2 py-1">
-          轨迹：{selectedPlayer?.name ?? "已选玩家"}
+        {analysis.flightPath.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
+            <span className="h-0 w-4 border-t-2 border-dashed border-chart-5" />
+            起始航线
+          </span>
+        ) : null}
+        <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
+          <span className="h-0 w-4 border-t-2 border-chart-1" />
+          运动轨迹：{selectedPlayer?.name ?? "已选玩家"}
         </span>
-        <span className="rounded-md border bg-background/85 px-2 py-1">
-          标记：击杀 / 伤害 / 开火 / 载具
+        <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
+          <span className="size-2 rounded-full border border-chart-2" />
+          圈：蓝圈 / 白圈 / 红区 / 特殊区
         </span>
         {visibleCarePackages.length ? (
           <span className="rounded-md border bg-background/85 px-2 py-1">
             补给箱：{visibleCarePackages.length}
           </span>
         ) : null}
-        {currentFrame?.zones?.bluezone ? (
-          <span className="rounded-md border bg-background/85 px-2 py-1">
-            蓝圈 / 白圈 / 红区 / 特殊区
-          </span>
-        ) : null}
+        <span className="rounded-md border bg-background/85 px-2 py-1">
+          标记：击杀 / 伤害 / 开火 / 载具
+        </span>
       </div>
       <div className="absolute right-3 bottom-12 flex flex-col gap-1">
         <Button

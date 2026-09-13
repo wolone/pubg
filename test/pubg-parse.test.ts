@@ -523,6 +523,47 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("extracts a deduplicated starting flight path from aircraft positions", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200, z: 1000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.456",
+            location: { x: 120, y: 220, z: 1000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            location: { x: 500, y: 600, z: 1000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+      ],
+      "account.123",
+      "match-flight-path"
+    )
+
+    expect(analysis.flightPath).toEqual([
+      { x: 110, y: 210, z: 1000 },
+      { x: 500, y: 600, z: 1000 },
+    ])
+  })
+
   it("rounds replay map coordinates without changing event locations", () => {
     const analysis = parseTelemetry(
       [

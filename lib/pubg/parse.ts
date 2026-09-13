@@ -230,6 +230,7 @@ export function parseTelemetry(
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
   trajectory: Array<{ x: number; y: number; z?: number }>
+  flightPath: Array<{ x: number; y: number; z?: number }>
   replayPlayers: ReplayPlayer[]
   replayFrames: ReplayFrame[]
   replayDurationSeconds: number
@@ -237,6 +238,10 @@ export function parseTelemetry(
   const events = Array.isArray(raw) ? raw : []
   const timeline: TelemetryEvent[] = []
   const trajectory: Array<{ x: number; y: number; z?: number }> = []
+  const flightPathBuckets = new Map<
+    number,
+    { x: number; y: number; z: number; count: number }
+  >()
   const replayChanges: ReplayChange[] = []
   const replayPlayersById = new Map<string, ReplayPlayer>()
   const positionCounts = new Map<string, number>()
@@ -311,6 +316,28 @@ export function parseTelemetry(
     const replaySnapshot = parseReplaySnapshot(event)
     const phase = replayPhaseOf(event)
     const vehicleType = vehicleTypeOf(vehicle)
+    const isFlightPosition =
+      type === "LogPlayerPosition" &&
+      location &&
+      (isTransportAircraft(vehicle) || isAirplanePhase(phase))
+
+    if (isFlightPosition) {
+      const bucket = Math.max(0, Math.round(elapsedSeconds))
+      const current = flightPathBuckets.get(bucket)
+      if (current) {
+        current.x += location.x
+        current.y += location.y
+        current.z += location.z ?? 0
+        current.count += 1
+      } else {
+        flightPathBuckets.set(bucket, {
+          x: location.x,
+          y: location.y,
+          z: location.z ?? 0,
+          count: 1,
+        })
+      }
+    }
     const isVehicleLeave = /VehicleLeave|PlayerLeaveVehicle/i.test(type)
     const vehicleState =
       isVehicleLeave ||
@@ -500,6 +527,16 @@ export function parseTelemetry(
       playerId
     ),
     trajectory: downsample(trajectory, 240),
+    flightPath: downsample(
+      Array.from(flightPathBuckets.entries())
+        .sort(([left], [right]) => left - right)
+        .map(([, point]) => ({
+          x: point.x / point.count,
+          y: point.y / point.count,
+          z: point.z / point.count,
+        })),
+      96
+    ),
     replayPlayers,
     replayFrames: replay.frames,
     replayDurationSeconds: replay.durationSeconds,
@@ -597,6 +634,19 @@ function vehicleTypeOf(vehicle: Record<string, unknown> | undefined) {
     undefined
   if (!vehicleType || /transportaircraft/i.test(vehicleType)) return undefined
   return vehicleType
+}
+
+function isTransportAircraft(vehicle: Record<string, unknown> | undefined) {
+  if (!vehicle) return false
+  const vehicleType = stringValue(
+    vehicle.vehicleType,
+    stringValue(vehicle.vehicleId, "")
+  )
+  return /transportaircraft/i.test(vehicleType)
+}
+
+function isAirplanePhase(phase: number | undefined) {
+  return phase !== undefined && phase > 0 && phase < 0.2
 }
 
 function replayPhaseOf(event: Record<string, unknown>) {
