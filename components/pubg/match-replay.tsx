@@ -1973,7 +1973,10 @@ function ReplayHud({
   const hasFullPositionCoverage =
     participantCount === 0 || analysis.replayPlayers.length >= participantCount
   const estimatedAlivePlayers = hasFullPositionCoverage
-    ? activePlayers.length
+    ? Math.min(
+        activePlayers.length,
+        participantCount > 0 ? participantCount : activePlayers.length
+      )
     : undefined
   const reliableAlivePlayers =
     currentFrame?.alivePlayers ?? estimatedAlivePlayers
@@ -1981,6 +1984,8 @@ function ReplayHud({
     (event) =>
       event.elapsedSeconds === undefined || event.elapsedSeconds <= currentTime
   ).length
+  const displayPhase =
+    currentPhase !== undefined && currentPhase >= 1 ? currentPhase : undefined
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1997,7 +2002,7 @@ function ReplayHud({
             : currentFrame?.alivePlayers !== undefined
               ? "官方遥测"
               : reliableAlivePlayers !== undefined
-                ? "根据完整位置帧估算"
+                ? "根据位置帧估算"
                 : "等待官方存活数据"
         }
         icon={UsersIcon}
@@ -2011,7 +2016,7 @@ function ReplayHud({
       <StatCard
         label="目标玩家状态"
         value={targetState ? statusLabels[targetState[3]] : "未知"}
-        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${targetVehicle ? "载具移动 · " : ""}${currentPhase !== undefined ? `阶段 ${formatPhase(currentPhase)} · ` : ""}T+${formatTime(currentTime)}`}
+        detail={`${targetHealth !== undefined ? `${Math.round(targetHealth)}% 生命 · ` : ""}${targetVehicle ? "载具移动 · " : ""}${displayPhase !== undefined ? `阶段 ${formatPhase(displayPhase)} · ` : ""}T+${formatTime(currentTime)}`}
         icon={ActivityIcon}
       />
       <StatCard
