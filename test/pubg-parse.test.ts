@@ -342,6 +342,47 @@ describe("PUBG JSON:API parser", () => {
     })
   })
 
+  it("keeps replay phases monotonic when telemetry repeats an older phase", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPhaseChange",
+          elapsedTime: 10,
+          common: { isGame: 5 },
+        },
+        {
+          _T: "LogGameStatePeriodic",
+          elapsedTime: 20,
+          gameState: {
+            isGame: 4.5,
+            safetyZonePosition: { x: 400, y: 500 },
+            safetyZoneRadius: 300,
+          },
+        },
+        {
+          _T: "LogPhaseChange",
+          elapsedTime: 30,
+          common: { isGame: 6 },
+        },
+      ],
+      "account.123",
+      "match-monotonic-phase"
+    )
+
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 20)?.phase
+    ).toBe(5)
+    expect(analysis.replayFrames.at(-1)?.phase).toBe(6)
+  })
+
   it("adds care package events to the replay timeline with map locations", () => {
     const analysis = parseTelemetry(
       [

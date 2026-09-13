@@ -776,7 +776,12 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       if (change.zones) zones = change.zones
       if (change.alivePlayers !== undefined) alivePlayers = change.alivePlayers
       if (change.aliveTeams !== undefined) aliveTeams = change.aliveTeams
-      if (change.phase !== undefined) phase = change.phase
+      if (
+        change.phase !== undefined &&
+        (phase === undefined || change.phase >= phase)
+      ) {
+        phase = change.phase
+      }
       if (change.playerId) {
         const previous = states.get(change.playerId)
         if (change.location) {
