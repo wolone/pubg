@@ -437,39 +437,39 @@ type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
 type ReplayTimelineLayer = "events" | "zones"
 
-function MapEventMarker({
+function MapEventMarker({ children }: { children: React.ReactNode }) {
+  return <g>{children}</g>
+}
+
+function MapEventButton({
   event,
+  bounds,
   onSelect,
-  children,
 }: {
   event: MatchAnalysis["timeline"][number]
+  bounds: ReplayMapBounds
   onSelect: (event: MatchAnalysis["timeline"][number]) => void
-  children: React.ReactNode
 }) {
+  const left = ((event.location?.x ?? bounds.minX) - bounds.minX) / bounds.width
+  const top = ((event.location?.y ?? bounds.minY) - bounds.minY) / bounds.height
+
   return (
-    <g
-      role="button"
-      tabIndex={0}
+    <Button
+      type="button"
+      size="icon-xs"
+      variant="ghost"
       data-map-event-marker="true"
-      className="pointer-events-auto cursor-pointer"
-      pointerEvents="all"
+      className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full p-0 opacity-0 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+      style={{ left: `${left * 100}%`, top: `${top * 100}%` }}
       aria-label={`打开事件 ${formatTime(event.elapsedSeconds ?? 0)}：${event.message}`}
       onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
       onClick={(pointerEvent) => {
         pointerEvent.stopPropagation()
         onSelect(event)
       }}
-      onKeyDown={(keyboardEvent) => {
-        if (keyboardEvent.key !== "Enter" && keyboardEvent.key !== " ") {
-          return
-        }
-        keyboardEvent.preventDefault()
-        keyboardEvent.stopPropagation()
-        onSelect(event)
-      }}
     >
-      {children}
-    </g>
+      <span className="sr-only">{event.message}</span>
+    </Button>
   )
 }
 
@@ -602,6 +602,12 @@ function ReplayMap({
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
   )
+  const mapEvents = [
+    ...visibleKills,
+    ...visibleDamage,
+    ...visibleAttacks,
+    ...visibleCarePackages,
+  ]
   const mapAssetUrl = MAP_ASSET_PATHS[mapName] ?? null
   const panRef = React.useRef<{
     startX: number
@@ -844,11 +850,7 @@ function ReplayMap({
           {showEvents
             ? visibleKills.map((kill, index) =>
                 kill.location ? (
-                  <MapEventMarker
-                    key={`${kill.timestamp}-${index}`}
-                    event={kill}
-                    onSelect={onEventSelect}
-                  >
+                  <MapEventMarker key={`${kill.timestamp}-${index}`}>
                     <title>{kill.message}</title>
                     <circle
                       cx={kill.location.x}
@@ -884,11 +886,7 @@ function ReplayMap({
           {showEvents
             ? visibleDamage.map((event, index) =>
                 event.location ? (
-                  <MapEventMarker
-                    key={`${event.timestamp}-${index}`}
-                    event={event}
-                    onSelect={onEventSelect}
-                  >
+                  <MapEventMarker key={`${event.timestamp}-${index}`}>
                     <circle
                       cx={event.location.x}
                       cy={event.location.y}
@@ -905,11 +903,7 @@ function ReplayMap({
           {showEvents
             ? visibleAttacks.map((event, index) =>
                 event.location ? (
-                  <MapEventMarker
-                    key={`attack-${event.timestamp}-${index}`}
-                    event={event}
-                    onSelect={onEventSelect}
-                  >
+                  <MapEventMarker key={`attack-${event.timestamp}-${index}`}>
                     <title>{event.message}</title>
                     <path
                       d={`M ${event.location.x - Math.max(bounds.width / 260, 5)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 260, 5)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 260, 5)} V ${event.location.y + Math.max(bounds.width / 260, 5)}`}
@@ -945,8 +939,6 @@ function ReplayMap({
                 event.location ? (
                   <MapEventMarker
                     key={`care-package-${event.timestamp}-${index}`}
-                    event={event}
-                    onSelect={onEventSelect}
                   >
                     <rect
                       x={event.location.x - Math.max(bounds.width / 170, 8)}
@@ -1061,6 +1053,21 @@ function ReplayMap({
             }
           )}
         </svg>
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-label="地图事件点击层"
+        >
+          {showEvents
+            ? mapEvents.map((event, index) => (
+                <MapEventButton
+                  key={`map-event-${event.type}-${event.timestamp}-${index}`}
+                  event={event}
+                  bounds={bounds}
+                  onSelect={onEventSelect}
+                />
+              ))
+            : null}
+        </div>
       </div>
       <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2">
         <Badge variant="secondary" className="bg-background/85">
