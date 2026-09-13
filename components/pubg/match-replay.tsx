@@ -2050,6 +2050,7 @@ function ReplayEventMarkers({
     Array<{
       event: MatchAnalysis["timeline"][number]
       seconds: number
+      endSeconds: number
       count: number
     }>
   >()
@@ -2070,10 +2071,12 @@ function ReplayEventMarkers({
       event.elapsedSeconds - previous.seconds < groupingGapSeconds
     ) {
       previous.count += 1
+      previous.endSeconds = event.elapsedSeconds
     } else {
       kindMarkers.push({
         event,
         seconds: event.elapsedSeconds,
+        endSeconds: event.elapsedSeconds,
         count: 1,
       })
     }
@@ -2104,56 +2107,60 @@ function ReplayEventMarkers({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 h-16">
-      {markers.map(({ event, seconds, lane, count, kind }, index) => {
-        const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
-        return (
-          <Button
-            key={`${event.type}-${event.timestamp}-${index}`}
-            type="button"
-            size="icon-xs"
-            variant={
-              kind === "kills"
-                ? "destructive"
-                : kind === "attacks"
-                  ? "secondary"
-                  : "outline"
-            }
-            className={cn(
-              "pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full",
-              Math.abs(seconds - currentTime) <= 0.5 &&
-                "ring-2 ring-ring ring-offset-1"
-            )}
-            style={{
-              left: `${position}%`,
-              top: `calc(50% + ${markerLaneOffsets[lane]}px)`,
-            }}
-            aria-current={
-              Math.abs(seconds - currentTime) <= 0.5 ? "time" : undefined
-            }
-            aria-label={
-              count > 1
-                ? `跳转到 ${formatTime(seconds)}：${event.message}，另有 ${count - 1} 个相近事件`
-                : `跳转到 ${formatTime(seconds)}：${event.message}`
-            }
-            onPointerDown={(pointerEvent) => {
-              pointerEvent.preventDefault()
-              pointerEvent.stopPropagation()
-            }}
-            onClick={(clickEvent) => {
-              clickEvent.stopPropagation()
-              onSeek(seconds)
-            }}
-          >
-            {count > 1 ? (
-              <span className="rounded-full bg-current px-0.5 text-[9px] leading-3 text-background">
-                {count > 9 ? "9+" : count}
-              </span>
-            ) : (
-              <span className="size-1.5 rounded-full bg-current" />
-            )}
-          </Button>
-        )
-      })}
+      {markers.map(
+        ({ event, seconds, endSeconds, lane, count, kind }, index) => {
+          const position = Math.min(
+            100,
+            Math.max(0, (seconds / duration) * 100)
+          )
+          const isActive =
+            currentTime >= seconds - 0.5 && currentTime <= endSeconds + 0.5
+          return (
+            <Button
+              key={`${event.type}-${event.timestamp}-${index}`}
+              type="button"
+              size="icon-xs"
+              variant={
+                kind === "kills"
+                  ? "destructive"
+                  : kind === "attacks"
+                    ? "secondary"
+                    : "outline"
+              }
+              className={cn(
+                "pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                isActive && "ring-2 ring-ring ring-offset-1"
+              )}
+              style={{
+                left: `${position}%`,
+                top: `calc(50% + ${markerLaneOffsets[lane]}px)`,
+              }}
+              aria-current={isActive ? "time" : undefined}
+              aria-label={
+                count > 1
+                  ? `跳转到 ${formatTime(seconds)}：${event.message}，另有 ${count - 1} 个相近事件`
+                  : `跳转到 ${formatTime(seconds)}：${event.message}`
+              }
+              onPointerDown={(pointerEvent) => {
+                pointerEvent.preventDefault()
+                pointerEvent.stopPropagation()
+              }}
+              onClick={(clickEvent) => {
+                clickEvent.stopPropagation()
+                onSeek(seconds)
+              }}
+            >
+              {count > 1 ? (
+                <span className="rounded-full bg-current px-0.5 text-[9px] leading-3 text-background">
+                  {count > 9 ? "9+" : count}
+                </span>
+              ) : (
+                <span className="size-1.5 rounded-full bg-current" />
+              )}
+            </Button>
+          )
+        }
+      )}
     </div>
   )
 }
