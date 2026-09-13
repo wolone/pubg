@@ -615,6 +615,18 @@ function ReplayMap({
           aria-label="比赛回放地图"
         >
           <defs>
+            <marker
+              id="replay-flight-arrow"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+            </marker>
             <pattern
               id="replay-grid"
               width={bounds.width / 12}
@@ -660,6 +672,7 @@ function ReplayMap({
                   strokeDasharray={`${Math.max(bounds.width / 90000, 10)} ${Math.max(bounds.width / 70000, 8)}`}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  markerEnd="url(#replay-flight-arrow)"
                   vectorEffect="non-scaling-stroke"
                 />
               ) : null}
@@ -1657,7 +1670,7 @@ function ReplayEventMarkers({
   duration: number
   onSeek: (seconds: number) => void
 }) {
-  const markerLaneOffsets = [-12, 0, 12]
+  const markerLaneOffsets = [-6, 0, 6]
   const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
   const markers = events
     .flatMap((event) => {
@@ -1688,7 +1701,7 @@ function ReplayEventMarkers({
   if (duration <= 0 || markers.length === 0) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-1/2 h-6 -translate-y-1/2">
+    <div className="pointer-events-none absolute inset-x-0 top-0 h-5">
       {markers.map(({ event, seconds, lane }, index) => {
         const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
         return (
@@ -1745,7 +1758,7 @@ function ReplayZoneMarkers({
   if (duration <= 0 || markers.length === 0) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-1/2 h-6 -translate-y-1/2">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5">
       {markers.map((frame, index) => {
         const position = Math.min(
           100,
@@ -1761,7 +1774,7 @@ function ReplayZoneMarkers({
             type="button"
             size="icon-xs"
             variant="outline"
-            className="pointer-events-auto absolute top-1/2 -translate-x-1/2 translate-y-2 rounded-sm border-blue-500 bg-background"
+            className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-sm border-blue-500 bg-background"
             style={{ left: `${position}%` }}
             aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
             onClick={() => onSeek(frame.elapsedSeconds)}
@@ -2045,7 +2058,7 @@ export function MatchReplay({
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
-                    <div className="relative py-4">
+                    <div className="relative py-5">
                       <Slider
                         value={[currentTime]}
                         min={0}
