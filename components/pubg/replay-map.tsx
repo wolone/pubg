@@ -71,6 +71,11 @@ export const MAP_ASSET_PATHS: Record<string, string> = {
   Neon_Main: "/maps/Neon_Main.jpg",
 }
 
+const CARE_PACKAGE_ASSET_PATHS = {
+  flying: "/assets/care-package-flying.png",
+  normal: "/assets/care-package-normal.png",
+} as const
+
 const statusLabels: Record<ReplayPlayerStatus, string> = {
   alive: "存活",
   knocked: "倒地",
@@ -874,26 +879,23 @@ export function ReplayMap({
             ? visibleCarePackages.map((event, index) => {
                 if (!event.location) return null
                 const point = model.projectPoint(event.location)
-                const size = screenToMap(7)
+                const isFlying = event.type.includes("Spawn")
+                const width = screenToMap(18)
+                const height = screenToMap(isFlying ? 32 : 17)
                 return (
                   <g key={`care-package-${event.timestamp}-${index}`}>
                     <title>{event.message}</title>
-                    <rect
-                      x={point.x - size}
-                      y={point.y - size}
-                      width={size * 2}
-                      height={size * 2}
-                      rx={screenToMap(2)}
-                      fill="var(--chart-4)"
-                      fillOpacity="0.95"
-                      stroke="var(--background)"
-                      strokeWidth={screenToMap(1.5)}
-                    />
-                    <path
-                      d={`M ${point.x - size * 0.65} ${point.y} H ${point.x + size * 0.65} M ${point.x} ${point.y - size * 0.65} V ${point.y + size * 0.65}`}
-                      stroke="var(--background)"
-                      strokeWidth={screenToMap(1.5)}
-                      strokeLinecap="round"
+                    <image
+                      href={
+                        isFlying
+                          ? CARE_PACKAGE_ASSET_PATHS.flying
+                          : CARE_PACKAGE_ASSET_PATHS.normal
+                      }
+                      x={point.x - width / 2}
+                      y={point.y - height + screenToMap(2)}
+                      width={width}
+                      height={height}
+                      preserveAspectRatio="xMidYMid meet"
                     />
                   </g>
                 )
