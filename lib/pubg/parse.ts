@@ -319,6 +319,8 @@ export function parseTelemetry(
     )
     const victimHealth = optionalPercentageNumber(victim?.health)
     const damage = optionalNonNegativeNumber(event.damage)
+    const healAmount = optionalNonNegativeNumber(event.healamount)
+    const eventAlivePlayers = optionalNonNegativeNumber(event.numAlivePlayers)
     const damageType = stringValue(event.damageTypeCategory, "") || undefined
     const replaySnapshot = parseReplaySnapshot(event)
     const phase = replayPhaseOf(event)
@@ -377,10 +379,17 @@ export function parseTelemetry(
       )
     }
 
-    if (replaySnapshot || phase !== undefined) {
+    if (
+      replaySnapshot ||
+      eventAlivePlayers !== undefined ||
+      phase !== undefined
+    ) {
       replayChanges.push({
         elapsedSeconds,
-        ...replaySnapshot,
+        ...(replaySnapshot ?? {}),
+        ...(eventAlivePlayers !== undefined
+          ? { alivePlayers: eventAlivePlayers }
+          : {}),
         phase,
       })
     }
@@ -440,6 +449,26 @@ export function parseTelemetry(
         damageDelta: damage,
       })
     }
+    if (
+      type.includes("Damage") &&
+      target &&
+      damage !== undefined &&
+      victimHealth === undefined &&
+      damage > 0
+    ) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: target,
+        healthDelta: -damage,
+      })
+    }
+    if (type === "LogHeal" && characterId && healAmount !== undefined) {
+      replayChanges.push({
+        elapsedSeconds,
+        playerId: characterId,
+        healthDelta: healAmount,
+      })
+    }
 
     if (type.includes("Kill")) {
       if (target) {
@@ -461,6 +490,7 @@ export function parseTelemetry(
           elapsedSeconds,
           playerId: deadPlayerId,
           status: "dead",
+          health: 0,
         })
       }
     } else if (/groggy|knock/i.test(type)) {
@@ -569,6 +599,7 @@ type ReplayChange = {
   location?: { x: number; y: number; z?: number } | null
   status?: ReplayPlayerStatus
   health?: number
+  healthDelta?: number
   vehicleType?: string | null
   killsDelta?: number
   damageDelta?: number
@@ -579,13 +610,22 @@ type ReplayChange = {
 }
 
 type ReplayState = {
-  x: number
-  y: number
+  x?: number
+  y?: number
   status: ReplayPlayerStatus
   health?: number
   vehicleType?: string
   kills: number
   damage: number
+}
+
+function initialReplayState(): ReplayState {
+  return {
+    status: "alive",
+    health: 100,
+    kills: 0,
+    damage: 0,
+  }
 }
 
 function timestampOf(event: Record<string, unknown>): number | null {
@@ -805,7 +845,13 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
   const exactFrameTimes = new Set(
     sortedChanges
-      .filter((change) => change.status !== undefined)
+      .filter(
+        (change) =>
+          change.status !== undefined ||
+          change.healthDelta !== undefined ||
+          change.killsDelta !== undefined ||
+          change.damageDelta !== undefined
+      )
       .map((change) => change.elapsedSeconds)
   )
   const frameTimes = new Set<number>(exactFrameTimes)
@@ -844,39 +890,46 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       }
       if (change.playerId) {
         const previous = states.get(change.playerId)
+        const base = previous ?? initialReplayState()
         if (change.location) {
           states.set(change.playerId, {
+            ...base,
             x: Math.round(change.location.x),
             y: Math.round(change.location.y),
-            status: change.status ?? previous?.status ?? "alive",
-            health: change.health ?? previous?.health,
-            kills: previous?.kills ?? 0,
-            damage: previous?.damage ?? 0,
+            status: change.status ?? base.status,
+            health: change.health ?? base.health,
             ...(change.vehicleType !== undefined
-              ? change.vehicleType === null
-                ? {}
-                : { vehicleType: change.vehicleType }
+              ? { vehicleType: change.vehicleType ?? undefined }
               : previous?.vehicleType
                 ? { vehicleType: previous.vehicleType }
                 : {}),
           })
         } else if (
-          previous &&
-          (change.status !== undefined ||
-            change.health !== undefined ||
-            change.vehicleType !== undefined ||
-            change.killsDelta !== undefined ||
-            change.damageDelta !== undefined)
+          change.status !== undefined ||
+          change.health !== undefined ||
+          change.healthDelta !== undefined ||
+          change.vehicleType !== undefined ||
+          change.killsDelta !== undefined ||
+          change.damageDelta !== undefined
         ) {
           states.set(change.playerId, {
-            ...previous,
+            ...base,
             ...(change.status ? { status: change.status } : {}),
-            ...(change.health !== undefined ? { health: change.health } : {}),
+            ...(change.health !== undefined
+              ? { health: change.health }
+              : change.healthDelta !== undefined
+                ? {
+                    health: Math.min(
+                      100,
+                      Math.max(0, (base.health ?? 100) + change.healthDelta)
+                    ),
+                  }
+                : {}),
             ...(change.killsDelta !== undefined
-              ? { kills: previous.kills + change.killsDelta }
+              ? { kills: base.kills + change.killsDelta }
               : {}),
             ...(change.damageDelta !== undefined
-              ? { damage: previous.damage + change.damageDelta }
+              ? { damage: base.damage + change.damageDelta }
               : {}),
             ...(change.vehicleType !== undefined
               ? change.vehicleType === null
@@ -892,7 +945,13 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     const framePlayers = Array.from(states.entries())
       .map(([id, state]) => {
         const playerIndex = playerIndexById.get(id)
-        if (playerIndex === undefined) return null
+        if (
+          playerIndex === undefined ||
+          state.x === undefined ||
+          state.y === undefined
+        ) {
+          return null
+        }
         const player: ReplayFramePlayer = [
           playerIndex,
           state.x,

@@ -107,7 +107,7 @@ describe("PUBG JSON:API parser", () => {
       180,
       300,
       "alive",
-      undefined,
+      100,
       1,
     ])
     expect(analysis.replayFrames.find((frame) => frame.zones)?.zones).toEqual({
@@ -318,12 +318,14 @@ describe("PUBG JSON:API parser", () => {
       100,
       200,
       "knocked",
+      100,
     ])
     expect(analysis.replayFrames.at(-1)?.players).toContainEqual([
       1,
       120,
       220,
       "alive",
+      100,
     ])
   })
 
@@ -869,6 +871,7 @@ describe("PUBG JSON:API parser", () => {
       300,
       400,
       "alive",
+      100,
     ])
   })
 
@@ -898,7 +901,13 @@ describe("PUBG JSON:API parser", () => {
       "match-rounded-replay"
     )
 
-    expect(analysis.replayFrames[0]?.players[0]).toEqual([0, 200, 301, "alive"])
+    expect(analysis.replayFrames[0]?.players[0]).toEqual([
+      0,
+      200,
+      301,
+      "alive",
+      100,
+    ])
     expect(analysis.timeline[0]?.location).toMatchObject({
       x: 210.49,
       y: 310.51,
@@ -1075,5 +1084,78 @@ describe("PUBG JSON:API parser", () => {
       "alive",
       72.5,
     ])
+  })
+
+  it("keeps official zone phase, alive count, damage and recovery in sync", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          numAlivePlayers: 2,
+          common: { isGame: 0.5 },
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerTakeDamage",
+          elapsedTime: 2,
+          damage: 30,
+          damageTypeCategory: "Damage_Gun",
+          attacker: { accountId: "account.other" },
+          victim: {
+            accountId: "account.123",
+            location: { x: 110, y: 210 },
+          },
+        },
+        {
+          _T: "LogHeal",
+          elapsedTime: 3,
+          healamount: 10,
+          character: { accountId: "account.123" },
+        },
+        {
+          _T: "LogPlayerMakeGroggy",
+          elapsedTime: 4,
+          attacker: { accountId: "account.other" },
+          victim: {
+            accountId: "account.123",
+            location: { x: 110, y: 210 },
+          },
+        },
+        {
+          _T: "LogPlayerRevive",
+          elapsedTime: 5,
+          victim: { accountId: "account.123" },
+        },
+      ],
+      "account.123",
+      "match-state-sync"
+    )
+
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 0)
+    ).toMatchObject({
+      alivePlayers: 2,
+      phase: 0.5,
+    })
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 2)
+        ?.players[0]?.[4]
+    ).toBe(70)
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 3)
+        ?.players[0]?.[4]
+    ).toBe(80)
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 4)
+        ?.players[0]?.[3]
+    ).toBe("knocked")
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 5)
+        ?.players[0]?.[3]
+    ).toBe("alive")
   })
 })
