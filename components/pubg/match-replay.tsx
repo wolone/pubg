@@ -1083,13 +1083,19 @@ function Roster({
   )
 }
 
-type TimelineFilter = "all" | "combat" | "state"
+type TimelineFilter = "all" | "combat" | "state" | "selected"
 
 function matchesTimelineFilter(
   event: MatchAnalysis["timeline"][number],
-  filter: TimelineFilter
+  filter: TimelineFilter,
+  selectedPlayerId: string
 ) {
   if (filter === "all") return true
+  if (filter === "selected") {
+    return (
+      event.actor === selectedPlayerId || event.target === selectedPlayerId
+    )
+  }
   if (filter === "combat") {
     return /Kill|Damage|Death|Attack/.test(event.type)
   }
@@ -1103,18 +1109,20 @@ function ReplayTimeline({
   currentTime,
   onSeek,
   playerNames,
+  selectedPlayerId,
 }: {
   events: MatchAnalysis["timeline"]
   currentTime: number
   onSeek: (seconds: number) => void
   playerNames: Map<string, string>
+  selectedPlayerId: string
 }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("all")
   const [selectedEvent, setSelectedEvent] = React.useState<
     MatchAnalysis["timeline"][number] | null
   >(null)
   const filteredEvents = events.filter((event) =>
-    matchesTimelineFilter(event, filter)
+    matchesTimelineFilter(event, filter, selectedPlayerId)
   )
   const activeIndex = filteredEvents.reduce(
     (result, event, index) =>
@@ -1154,6 +1162,7 @@ function ReplayTimeline({
               <ToggleGroupItem value="all">全部</ToggleGroupItem>
               <ToggleGroupItem value="combat">战斗</ToggleGroupItem>
               <ToggleGroupItem value="state">状态</ToggleGroupItem>
+              <ToggleGroupItem value="selected">当前玩家</ToggleGroupItem>
             </ToggleGroup>
             <Button
               size="sm"
@@ -1761,6 +1770,7 @@ export function MatchReplay({
             events={analysis.timeline}
             currentTime={currentTime}
             playerNames={playerNames}
+            selectedPlayerId={selectedPlayerId}
             onSeek={(seconds) => {
               setPlaying(false)
               setTime(seconds)
