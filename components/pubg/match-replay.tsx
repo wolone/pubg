@@ -1483,6 +1483,9 @@ export function MatchReplay({
     analysis.replayFrames.some(
       (frame) => isReplayZoneActive(frame) && Boolean(frame.zones)
     )
+  const targetTeamId = analysis.replayPlayers.find(
+    (player) => player.id === analysis.playerId
+  )?.teamId
   const timelineLayerCounts = React.useMemo(() => {
     const counts: Record<ReplayTimelineLayer, number> = {
       kills: 0,
@@ -1802,16 +1805,24 @@ export function MatchReplay({
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-chart-1" />{" "}
-                        目标玩家
+                        <span
+                          className="size-2 rounded-full"
+                          style={{
+                            backgroundColor: teamMarkerColor(targetTeamId),
+                          }}
+                        />{" "}
+                        目标队伍
+                        {targetTeamId !== undefined
+                          ? `（队 ${targetTeamId}）`
+                          : ""}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-chart-2" />{" "}
-                        其他玩家状态
+                        <span className="size-2 rounded-full border border-foreground/60" />{" "}
+                        颜色与数字代表战队
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-full border-2 border-dashed border-chart-2" />{" "}
-                        同队玩家
+                        同队辅助标记
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-full bg-destructive" />{" "}
