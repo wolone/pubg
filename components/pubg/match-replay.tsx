@@ -2058,6 +2058,24 @@ function ReplayZoneMarkers({
   onSeek: (seconds: number) => void
 }) {
   const markers = getReplayZoneMarkers(frames)
+  const markerLaneOffsets = [-12, 12]
+  const minimumMarkerGapSeconds = Math.max(30, duration / 40)
+  const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
+  const positionedMarkers = markers.map((frame) => {
+    const lane = laneEndTimes.findIndex(
+      (lastTime) => frame.elapsedSeconds - lastTime >= minimumMarkerGapSeconds
+    )
+    const resolvedLane =
+      lane >= 0
+        ? lane
+        : laneEndTimes.reduce(
+            (leastBusyLane, lastTime, index) =>
+              lastTime < laneEndTimes[leastBusyLane]! ? index : leastBusyLane,
+            0
+          )
+    laneEndTimes[resolvedLane] = frame.elapsedSeconds
+    return { frame, lane: resolvedLane }
+  })
   const activeMarkerIndex = markers.reduce(
     (result, frame, index) =>
       frame.elapsedSeconds <= currentTime ? index : result,
@@ -2066,8 +2084,8 @@ function ReplayZoneMarkers({
   if (duration <= 0 || markers.length === 0) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-5">
-      {markers.map((frame, index) => {
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10">
+      {positionedMarkers.map(({ frame, lane }, index) => {
         const position = Math.min(
           100,
           Math.max(0, (frame.elapsedSeconds / duration) * 100)
@@ -2083,7 +2101,10 @@ function ReplayZoneMarkers({
             size="icon-xs"
             variant={index === activeMarkerIndex ? "secondary" : "outline"}
             className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-sm border-blue-500 bg-background"
-            style={{ left: `${position}%` }}
+            style={{
+              left: `${position}%`,
+              top: `calc(50% + ${markerLaneOffsets[lane]}px)`,
+            }}
             aria-current={index === activeMarkerIndex ? "time" : undefined}
             aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
             onPointerDown={(pointerEvent) => {
@@ -2390,7 +2411,7 @@ export function MatchReplay({
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
-                    <div className="relative pt-20 pb-5">
+                    <div className="relative pt-20 pb-12">
                       <Slider
                         value={[currentTime]}
                         min={0}
