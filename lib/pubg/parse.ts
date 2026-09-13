@@ -780,13 +780,7 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
   const exactFrameTimes = new Set(
     sortedChanges
-      .filter(
-        (change) =>
-          change.status !== undefined ||
-          change.zones !== undefined ||
-          change.alivePlayers !== undefined ||
-          change.aliveTeams !== undefined
-      )
+      .filter((change) => change.status !== undefined)
       .map((change) => change.elapsedSeconds)
   )
   const frameTimes = new Set<number>(exactFrameTimes)
