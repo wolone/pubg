@@ -42,8 +42,8 @@ const stringValue = (value: unknown, fallback = "") =>
 const MAX_REPLAY_PLAYERS = 100
 // Keep the normalized replay snapshot safely below D1's per-value limit while
 // retaining enough frames for smooth interpolation between official events.
-const MAX_REPLAY_PLAYER_FRAMES = 48 * 600
-const MAX_REPLAY_FRAME_COUNT = 320
+const MAX_REPLAY_PLAYER_FRAMES = 64 * 600
+const MAX_REPLAY_FRAME_COUNT = 384
 
 const REPLAY_ATTACK_EVENT_TYPES = new Set([
   "LogPlayerAttack",
