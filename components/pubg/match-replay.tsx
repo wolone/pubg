@@ -550,31 +550,6 @@ function ReplayMap({
                 strokeWidth={Math.max(bounds.width / 816000, 1)}
               />
             </pattern>
-            {showZones && currentFrame?.zones?.safezone ? (
-              <mask
-                id="replay-bluezone-mask"
-                x={bounds.minX}
-                y={bounds.minY}
-                width={bounds.width}
-                height={bounds.height}
-                maskUnits="userSpaceOnUse"
-                maskContentUnits="userSpaceOnUse"
-              >
-                <rect
-                  x={bounds.minX}
-                  y={bounds.minY}
-                  width={bounds.width}
-                  height={bounds.height}
-                  fill="white"
-                />
-                <circle
-                  cx={currentFrame.zones.safezone.x}
-                  cy={currentFrame.zones.safezone.y}
-                  r={currentFrame.zones.safezone.radius}
-                  fill="black"
-                />
-              </mask>
-            ) : null}
           </defs>
           <rect
             x={bounds.minX}
@@ -673,16 +648,10 @@ function ReplayMap({
                 cx={currentFrame.zones.bluezone.x}
                 cy={currentFrame.zones.bluezone.y}
                 r={currentFrame.zones.bluezone.radius}
-                fill="#3b82f6"
-                fillOpacity="0.08"
+                fill="none"
                 stroke="#60a5fa"
                 strokeOpacity="0.95"
                 strokeWidth={2.5}
-                mask={
-                  currentFrame.zones.safezone
-                    ? "url(#replay-bluezone-mask)"
-                    : undefined
-                }
                 vectorEffect="non-scaling-stroke"
               />
             </g>
@@ -999,7 +968,7 @@ function ReplayMap({
         </span>
         <span className="inline-flex items-center gap-2 rounded-md border bg-background/85 px-2 py-1">
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full border-2 border-blue-400 bg-blue-500/20" />
+            <span className="size-2 rounded-full border-2 border-blue-400" />
             蓝圈
           </span>
           <span className="inline-flex items-center gap-1">
