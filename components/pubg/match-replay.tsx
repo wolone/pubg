@@ -39,6 +39,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Separator } from "@/components/ui/separator"
 import { Slider } from "@/components/ui/slider"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { StatCard } from "@/components/pubg/stat-card"
@@ -1536,6 +1537,29 @@ function Roster({
 
 type TimelineFilter = "all" | "combat" | "state" | "selected"
 
+function getReplayZoneMarkers(frames: ReplayFrame[]) {
+  const minimumMarkerGapSeconds = 30
+  const markers: ReplayFrame[] = []
+  let previousPhaseKey: string | undefined
+  let previousMarkerTime = Number.NEGATIVE_INFINITY
+
+  for (const frame of frames) {
+    if (!frame.zones) continue
+    const phaseKey = frame.phase === undefined ? "unknown" : String(frame.phase)
+    if (
+      phaseKey === previousPhaseKey ||
+      frame.elapsedSeconds - previousMarkerTime < minimumMarkerGapSeconds
+    ) {
+      continue
+    }
+    markers.push(frame)
+    previousPhaseKey = phaseKey
+    previousMarkerTime = frame.elapsedSeconds
+  }
+
+  return markers
+}
+
 function matchesTimelineFilter(
   event: MatchAnalysis["timeline"][number],
   filter: TimelineFilter,
@@ -1560,6 +1584,7 @@ function ReplayTimeline({
   playerNames,
   selectedPlayerId,
   visibleKinds,
+  zoneFrames,
 }: {
   events: MatchAnalysis["timeline"]
   currentTime: number
@@ -1567,6 +1592,7 @@ function ReplayTimeline({
   playerNames: Map<string, string>
   selectedPlayerId: string
   visibleKinds: ReplayTimelineLayer[]
+  zoneFrames: ReplayFrame[]
 }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("all")
   const [selectedEvent, setSelectedEvent] = React.useState<
@@ -1579,6 +1605,7 @@ function ReplayTimeline({
   const filteredEvents = layerEvents.filter((event) =>
     matchesTimelineFilter(event, filter, selectedPlayerId)
   )
+  const zoneMarkers = getReplayZoneMarkers(zoneFrames)
   const activeIndex = filteredEvents.reduce(
     (result, event, index) =>
       event.elapsedSeconds !== undefined && event.elapsedSeconds <= currentTime
@@ -1685,6 +1712,55 @@ function ReplayTimeline({
             </Empty>
           )}
         </div>
+        {visibleKinds.includes("zones") && zoneMarkers.length ? (
+          <div>
+            <Separator />
+            <div className="px-4 py-3">
+              <h4 className="text-sm font-semibold">圈层阶段</h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                点击阶段跳转到对应时间，地图仅显示圈线。
+              </p>
+            </div>
+            <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto px-2 pb-2 sm:grid-cols-3">
+              {zoneMarkers.map((frame, index) => {
+                const phaseLabel =
+                  frame.phase === undefined
+                    ? "圈层开始"
+                    : `阶段 ${formatPhase(frame.phase)}`
+                const zoneLabel = [
+                  frame.zones?.bluezone ? "蓝圈" : null,
+                  frame.zones?.safezone ? "白圈" : null,
+                  frame.zones?.redzone ? "红区" : null,
+                  frame.zones?.blackzone ? "特殊区" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
+                return (
+                  <Button
+                    key={`${frame.elapsedSeconds}-${index}`}
+                    type="button"
+                    variant="ghost"
+                    className="h-auto min-h-12 justify-start gap-2 px-2 py-2 text-left"
+                    aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
+                    onClick={() => onSeek(frame.elapsedSeconds)}
+                  >
+                    <span className="w-12 shrink-0 font-mono text-xs text-muted-foreground">
+                      {formatTime(frame.elapsedSeconds)}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-medium">
+                        {phaseLabel}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {zoneLabel || "圈层数据"}
+                      </span>
+                    </span>
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
       <Dialog
         open={selectedEvent !== null}
@@ -1948,24 +2024,7 @@ function ReplayZoneMarkers({
   duration: number
   onSeek: (seconds: number) => void
 }) {
-  const minimumMarkerGapSeconds = 30
-  const markers: ReplayFrame[] = []
-  let previousPhaseKey: string | undefined
-  let previousMarkerTime = Number.NEGATIVE_INFINITY
-
-  for (const frame of frames) {
-    if (!frame.zones) continue
-    const phaseKey = frame.phase === undefined ? "unknown" : String(frame.phase)
-    if (
-      phaseKey === previousPhaseKey ||
-      frame.elapsedSeconds - previousMarkerTime < minimumMarkerGapSeconds
-    ) {
-      continue
-    }
-    markers.push(frame)
-    previousPhaseKey = phaseKey
-    previousMarkerTime = frame.elapsedSeconds
-  }
+  const markers = getReplayZoneMarkers(frames)
   if (duration <= 0 || markers.length === 0) return null
 
   return (
@@ -2394,6 +2453,7 @@ export function MatchReplay({
             playerNames={playerNames}
             selectedPlayerId={selectedPlayerId}
             visibleKinds={visibleTimelineLayers}
+            zoneFrames={analysis.replayFrames}
             onSeek={(seconds) => {
               setPlaying(false)
               setTime(seconds)
