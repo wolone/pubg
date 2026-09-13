@@ -114,6 +114,35 @@ describe("replay frame synchronization", () => {
     ])
   })
 
+  it("uses the dense tracked-player sample in a compressed frame", () => {
+    const frames = [
+      {
+        elapsedSeconds: 0,
+        players: [[0, 100, 200, "alive" as const, 100]] as [
+          number,
+          number,
+          number,
+          "alive",
+          number
+        ][],
+      },
+      {
+        elapsedSeconds: 10,
+        players: [[0, 300, 400, "alive" as const, 100]] as [
+          number,
+          number,
+          number,
+          "alive",
+          number
+        ][],
+      },
+    ]
+
+    expect(
+      interpolateFrame(frames, 5, 0, { x: 212, y: 318 })?.players[0]
+    ).toEqual([0, 212, 318, "alive", 100])
+  })
+
   it("applies discrete player and vehicle states at the next frame time", () => {
     const frames = [
       {
