@@ -272,9 +272,16 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
     return [nextPlayer]
   })
 
-  const alivePlayers = left.alivePlayers ?? right.alivePlayers
-  const aliveTeams = left.aliveTeams ?? right.aliveTeams
-  const phase = left.phase ?? right.phase
+  const rightFrameActive = progress >= 0.5
+  const alivePlayers = rightFrameActive
+    ? (right.alivePlayers ?? left.alivePlayers)
+    : (left.alivePlayers ?? right.alivePlayers)
+  const aliveTeams = rightFrameActive
+    ? (right.aliveTeams ?? left.aliveTeams)
+    : (left.aliveTeams ?? right.aliveTeams)
+  const phase = rightFrameActive
+    ? (right.phase ?? left.phase)
+    : (left.phase ?? right.phase)
   const vehicles = progress < 0.5 ? left.vehicles : right.vehicles
   const frame: ReplayFrame = {
     elapsedSeconds,
@@ -409,13 +416,7 @@ function ReplayMap({
     }
     if (framePath.length > 0) return framePath.join(" ")
     return analysis.replayFrames.length === 0 ? path : ""
-  }, [
-    analysis.replayFrames,
-    currentFrame,
-    path,
-    targetIndex,
-    visibleTime,
-  ])
+  }, [analysis.replayFrames, currentFrame, path, targetIndex, visibleTime])
   const trackedPathPointCount = trackedPath ? trackedPath.split(" ").length : 0
   const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(Boolean)
   const visibleKills = analysis.timeline.filter(
