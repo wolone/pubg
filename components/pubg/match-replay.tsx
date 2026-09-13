@@ -435,7 +435,7 @@ function currentStates(frame: ReplayFrame | null) {
 
 type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
-type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "zones"
+type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "state" | "zones"
 
 function MapEventMarker({ children }: { children: React.ReactNode }) {
   return <g>{children}</g>
@@ -1764,7 +1764,11 @@ function ReplayEventMarkers({
             ? "damage"
             : event.type.includes("Attack")
               ? "attacks"
-              : undefined
+              : /Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
+                    event.type
+                  )
+                ? "state"
+                : undefined
       if (
         event.elapsedSeconds === undefined ||
         kind === undefined ||
@@ -1802,7 +1806,11 @@ function ReplayEventMarkers({
             type="button"
             size="icon-xs"
             variant={
-              event.type.includes("Attack") ? "secondary" : "destructive"
+              event.type.includes("Kill") || event.type.includes("Death")
+                ? "destructive"
+                : event.type.includes("Attack")
+                  ? "secondary"
+                  : "outline"
             }
             className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{
@@ -2157,6 +2165,9 @@ export function MatchReplay({
                         </ToggleGroupItem>
                         <ToggleGroupItem value="damage">伤害</ToggleGroupItem>
                         <ToggleGroupItem value="attacks">开火</ToggleGroupItem>
+                        <ToggleGroupItem value="state">
+                          状态/载具
+                        </ToggleGroupItem>
                         <ToggleGroupItem value="zones">
                           圈层阶段
                         </ToggleGroupItem>
@@ -2179,7 +2190,8 @@ export function MatchReplay({
                         (layer) =>
                           layer === "kills" ||
                           layer === "damage" ||
-                          layer === "attacks"
+                          layer === "attacks" ||
+                          layer === "state"
                       ) ? (
                         <ReplayEventMarkers
                           events={analysis.timeline}
