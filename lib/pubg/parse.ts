@@ -278,6 +278,7 @@ export function parseTelemetry(
   const replayChanges: ReplayChange[] = []
   const replayPlayersById = new Map<string, ReplayPlayer>()
   const positionCounts = new Map<string, number>()
+  let lastSnapshotPhase: number | undefined
   const participantIdsByName = new Map(
     participants.map((participant) => [participant.name, participant.id])
   )
@@ -408,6 +409,14 @@ export function parseTelemetry(
       )
     }
 
+    const snapshotPhaseChanged =
+      replaySnapshot &&
+      phase !== undefined &&
+      phase !== lastSnapshotPhase
+    if (replaySnapshot && phase !== undefined) {
+      lastSnapshotPhase = phase
+    }
+
     if (
       replaySnapshot ||
       eventAlivePlayers !== undefined ||
@@ -420,11 +429,13 @@ export function parseTelemetry(
           ? { alivePlayers: eventAlivePlayers }
           : {}),
         phase,
-        ...(replaySnapshot
-          ? { framePriority: "supporting" as const }
+        ...(snapshotPhaseChanged
+          ? { framePriority: "critical" as const }
+          : replaySnapshot
+            ? { framePriority: "supporting" as const }
           : type === "LogPhaseChange"
-            ? { framePriority: "critical" as const }
-            : {}),
+              ? { framePriority: "critical" as const }
+              : {}),
       })
     }
 
