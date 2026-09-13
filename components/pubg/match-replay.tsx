@@ -538,7 +538,8 @@ function currentStates(frame: ReplayFrame | null) {
 }
 
 type MapPan = { x: number; y: number }
-type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
+type ReplayLayer =
+  "flightPath" | "trajectory" | "zones" | "events" | "eliminated"
 type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "state" | "zones"
 
 function replayTimelineKind(
@@ -633,6 +634,7 @@ function ReplayMap({
   const showTrajectory = visibleLayers.includes("trajectory")
   const showZones = visibleLayers.includes("zones")
   const showEvents = visibleLayers.includes("events")
+  const showEliminated = visibleLayers.includes("eliminated")
   const showStateMarkers = visibleTimelineLayers.includes("state")
   const bounds = React.useMemo(
     () => getBounds(analysis, mapName),
@@ -700,7 +702,8 @@ function ReplayMap({
   const hasCurrentZones = Object.values(currentZones ?? {}).some(Boolean)
   const firstZoneFrame = analysis.replayFrames.find(
     (frame) =>
-      isReplayZoneActive(frame) && Object.values(frame.zones ?? {}).some(Boolean)
+      isReplayZoneActive(frame) &&
+      Object.values(frame.zones ?? {}).some(Boolean)
   )
   const visibleKills = analysis.timeline.filter(
     (kill) =>
@@ -1106,6 +1109,14 @@ function ReplayMap({
                 !isTarget &&
                 targetTeamId !== undefined &&
                 player.teamId === targetTeamId
+              if (
+                status === "dead" &&
+                !showEliminated &&
+                !isTarget &&
+                !isSelected
+              ) {
+                return null
+              }
               const radius = Math.max(bounds.width / (isTarget ? 90 : 180), 7)
               return (
                 <g key={player.id}>
@@ -1261,6 +1272,9 @@ function ReplayMap({
           </ToggleGroupItem>
           <ToggleGroupItem value="events" aria-label="切换事件标记">
             事件
+          </ToggleGroupItem>
+          <ToggleGroupItem value="eliminated" aria-label="切换淘汰玩家">
+            淘汰玩家
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
