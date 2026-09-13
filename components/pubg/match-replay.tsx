@@ -1705,7 +1705,7 @@ function ReplayTimeline({
           <div>
             <h3 className="text-sm font-semibold">事件时间线</h3>
             <p className="text-xs text-muted-foreground">
-              点击事件跳转到回放位置；上方事件开关同步控制地图标记和列表
+              点击事件跳转到回放位置；密集同类事件会合并标记，完整记录仍保留在下方列表
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -2045,18 +2045,44 @@ function ReplayEventMarkers({
   const markerLaneOffsets = [-24, 0, 24]
   const minimumMarkerGapSeconds = Math.max(8, duration / 40)
   const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
-  const markers = events
-    .flatMap((event) => {
-      const kind = replayTimelineKind(event)
-      if (
-        event.elapsedSeconds === undefined ||
-        kind === null ||
-        !visibleKinds.includes(kind)
-      ) {
-        return []
-      }
-      return [{ event, seconds: event.elapsedSeconds }]
-    })
+  const groupedMarkers = new Map<
+    Exclude<ReplayTimelineLayer, "zones">,
+    Array<{
+      event: MatchAnalysis["timeline"][number]
+      seconds: number
+      count: number
+    }>
+  >()
+  const groupingGapSeconds = Math.max(8, duration / 80)
+  for (const event of events) {
+    const kind = replayTimelineKind(event)
+    if (
+      event.elapsedSeconds === undefined ||
+      kind === null ||
+      !visibleKinds.includes(kind)
+    ) {
+      continue
+    }
+    const kindMarkers = groupedMarkers.get(kind) ?? []
+    const previous = kindMarkers.at(-1)
+    if (
+      previous &&
+      event.elapsedSeconds - previous.seconds < groupingGapSeconds
+    ) {
+      previous.count += 1
+    } else {
+      kindMarkers.push({
+        event,
+        seconds: event.elapsedSeconds,
+        count: 1,
+      })
+    }
+    groupedMarkers.set(kind, kindMarkers)
+  }
+  const markers = Array.from(groupedMarkers.entries())
+    .flatMap(([kind, kindMarkers]) =>
+      kindMarkers.map((marker) => ({ ...marker, kind }))
+    )
     .sort((left, right) => left.seconds - right.seconds)
     .map((marker) => {
       const lane =
@@ -2078,7 +2104,7 @@ function ReplayEventMarkers({
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 h-16">
-      {markers.map(({ event, seconds, lane }, index) => {
+      {markers.map(({ event, seconds, lane, count, kind }, index) => {
         const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
         return (
           <Button
@@ -2086,9 +2112,9 @@ function ReplayEventMarkers({
             type="button"
             size="icon-xs"
             variant={
-              isEliminationEvent(event)
+              kind === "kills"
                 ? "destructive"
-                : event.type.includes("Attack")
+                : kind === "attacks"
                   ? "secondary"
                   : "outline"
             }
@@ -2104,7 +2130,11 @@ function ReplayEventMarkers({
             aria-current={
               Math.abs(seconds - currentTime) <= 0.5 ? "time" : undefined
             }
-            aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
+            aria-label={
+              count > 1
+                ? `跳转到 ${formatTime(seconds)}：${event.message}，另有 ${count - 1} 个相近事件`
+                : `跳转到 ${formatTime(seconds)}：${event.message}`
+            }
             onPointerDown={(pointerEvent) => {
               pointerEvent.preventDefault()
               pointerEvent.stopPropagation()
@@ -2114,7 +2144,13 @@ function ReplayEventMarkers({
               onSeek(seconds)
             }}
           >
-            <span className="size-1.5 rounded-full bg-current" />
+            {count > 1 ? (
+              <span className="rounded-full bg-current px-0.5 text-[9px] leading-3 text-background">
+                {count > 9 ? "9+" : count}
+              </span>
+            ) : (
+              <span className="size-1.5 rounded-full bg-current" />
+            )}
           </Button>
         )
       })}
