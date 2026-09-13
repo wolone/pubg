@@ -450,8 +450,9 @@ function MapEventButton({
   bounds: ReplayMapBounds
   onSelect: (event: MatchAnalysis["timeline"][number]) => void
 }) {
-  const left = ((event.location?.x ?? bounds.minX) - bounds.minX) / bounds.width
-  const top = ((event.location?.y ?? bounds.minY) - bounds.minY) / bounds.height
+  if (!event.location) return null
+  const left = (event.location.x - bounds.minX) / bounds.width
+  const top = (event.location.y - bounds.minY) / bounds.height
 
   return (
     <Button
@@ -1146,11 +1147,11 @@ function ReplayMap({
             白圈
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full bg-red-500" />
+            <span className="size-2 rounded-full border-2 border-red-500" />
             红区
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="size-2 rounded-full border-2 border-dashed border-purple-400 bg-purple-500/20" />
+            <span className="size-2 rounded-full border-2 border-dashed border-purple-400" />
             特殊区
           </span>
         </span>
