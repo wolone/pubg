@@ -238,9 +238,12 @@ function frameAtTime(frame: ReplayFrame, elapsedSeconds: number) {
   return { ...frame, elapsedSeconds }
 }
 
-function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
+export function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
   if (frames.length === 0) return null
-  if (elapsedSeconds <= frames[0]!.elapsedSeconds) {
+  if (elapsedSeconds < frames[0]!.elapsedSeconds) {
+    return null
+  }
+  if (elapsedSeconds === frames[0]!.elapsedSeconds) {
     return frameAtTime(frames[0]!, elapsedSeconds)
   }
   if (elapsedSeconds >= frames.at(-1)!.elapsedSeconds) {
@@ -266,6 +269,12 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
     const rightPlayer = rightStates.get(playerIndex)
     const player = rightPlayer ?? leftPlayer
     if (!player) return []
+    if (!leftPlayer && rightPlayer && progress < 1) return []
+    const rightFrameActive = progress >= 1
+    const discretePlayer = rightFrameActive
+      ? (rightPlayer ?? leftPlayer)
+      : (leftPlayer ?? rightPlayer)
+    if (!discretePlayer) return []
     const nextPlayer: ReplayFramePlayer = [
       playerIndex,
       leftPlayer && rightPlayer
@@ -274,17 +283,11 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
       leftPlayer && rightPlayer
         ? leftPlayer[2] + (rightPlayer[2] - leftPlayer[2]) * progress
         : player[2],
-      progress < 0.5
-        ? (leftPlayer?.[3] ?? rightPlayer?.[3] ?? "alive")
-        : (rightPlayer?.[3] ?? leftPlayer?.[3] ?? "alive"),
+      discretePlayer[3],
     ]
     if (leftPlayer?.[4] !== undefined || rightPlayer?.[4] !== undefined) {
-      nextPlayer[4] =
-        leftPlayer?.[4] !== undefined && rightPlayer?.[4] !== undefined
-          ? leftPlayer[4] + (rightPlayer[4] - leftPlayer[4]) * progress
-          : (leftPlayer?.[4] ?? rightPlayer?.[4])
+      nextPlayer[4] = discretePlayer[4]
     }
-    const rightFrameActive = progress >= 0.5
     const kills = rightFrameActive
       ? (rightPlayer?.[5] ?? leftPlayer?.[5])
       : (leftPlayer?.[5] ?? rightPlayer?.[5])
@@ -296,7 +299,7 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
     return [nextPlayer]
   })
 
-  const rightFrameActive = progress >= 0.5
+  const rightFrameActive = progress >= 1
   const alivePlayers = rightFrameActive
     ? (right.alivePlayers ?? left.alivePlayers)
     : (left.alivePlayers ?? right.alivePlayers)
@@ -306,7 +309,7 @@ function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
   const phase = rightFrameActive
     ? (right.phase ?? left.phase)
     : (left.phase ?? right.phase)
-  const vehicles = progress < 0.5 ? left.vehicles : right.vehicles
+  const vehicles = rightFrameActive ? right.vehicles : left.vehicles
   const frame: ReplayFrame = {
     elapsedSeconds,
     players,
