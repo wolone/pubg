@@ -1610,6 +1610,11 @@ function ReplayTimeline({
     matchesTimelineFilter(event, filter, selectedPlayerId)
   )
   const zoneMarkers = getReplayZoneMarkers(zoneFrames)
+  const activeZoneIndex = zoneMarkers.reduce(
+    (result, frame, index) =>
+      frame.elapsedSeconds <= currentTime ? index : result,
+    -1
+  )
   const activeIndex = filteredEvents.reduce(
     (result, event, index) =>
       event.elapsedSeconds !== undefined && event.elapsedSeconds <= currentTime
@@ -1743,8 +1748,11 @@ function ReplayTimeline({
                   <Button
                     key={`${frame.elapsedSeconds}-${index}`}
                     type="button"
-                    variant="ghost"
+                    variant={index === activeZoneIndex ? "secondary" : "ghost"}
                     className="h-auto min-h-12 justify-start gap-2 px-2 py-2 text-left"
+                    aria-current={
+                      index === activeZoneIndex ? "time" : undefined
+                    }
                     aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
                     onClick={() => onSeek(frame.elapsedSeconds)}
                   >
@@ -2022,13 +2030,20 @@ function ReplayEventMarkers({
 function ReplayZoneMarkers({
   frames,
   duration,
+  currentTime,
   onSeek,
 }: {
   frames: ReplayFrame[]
   duration: number
+  currentTime: number
   onSeek: (seconds: number) => void
 }) {
   const markers = getReplayZoneMarkers(frames)
+  const activeMarkerIndex = markers.reduce(
+    (result, frame, index) =>
+      frame.elapsedSeconds <= currentTime ? index : result,
+    -1
+  )
   if (duration <= 0 || markers.length === 0) return null
 
   return (
@@ -2047,9 +2062,10 @@ function ReplayZoneMarkers({
             key={`${frame.elapsedSeconds}-${index}`}
             type="button"
             size="icon-xs"
-            variant="outline"
+            variant={index === activeMarkerIndex ? "secondary" : "outline"}
             className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-sm border-blue-500 bg-background"
             style={{ left: `${position}%` }}
+            aria-current={index === activeMarkerIndex ? "time" : undefined}
             aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
             onClick={() => onSeek(frame.elapsedSeconds)}
           >
@@ -2382,6 +2398,7 @@ export function MatchReplay({
                         <ReplayZoneMarkers
                           frames={analysis.replayFrames}
                           duration={duration}
+                          currentTime={currentTime}
                           onSeek={(seconds) => {
                             setPlaying(false)
                             setTime(seconds)
