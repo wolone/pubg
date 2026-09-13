@@ -412,6 +412,12 @@ function ReplayMap({
     selectedPlayerId,
     visibleTime,
   ])
+  const selectedPathPointCount = selectedPath
+    ? selectedPath.split(" ").length
+    : 0
+  const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(
+    Boolean
+  )
   const visibleKills = analysis.timeline.filter(
     (kill) =>
       kill.type.includes("Kill") &&
@@ -580,54 +586,66 @@ function ReplayMap({
             </g>
           ) : null}
           {currentFrame?.zones?.redzone ? (
-            <circle
-              cx={currentFrame.zones.redzone.x}
-              cy={currentFrame.zones.redzone.y}
-              r={currentFrame.zones.redzone.radius}
-              fill="var(--destructive)"
-              fillOpacity="0.08"
-              stroke="var(--destructive)"
-              strokeOpacity="0.65"
-              strokeWidth={Math.max(bounds.width / 300000, 2)}
-              strokeDasharray={`${Math.max(bounds.width / 100000, 6)} ${Math.max(bounds.width / 70000, 8)}`}
-            />
+            <g>
+              <title>红区</title>
+              <circle
+                cx={currentFrame.zones.redzone.x}
+                cy={currentFrame.zones.redzone.y}
+                r={currentFrame.zones.redzone.radius}
+                fill="var(--destructive)"
+                fillOpacity="0.08"
+                stroke="var(--destructive)"
+                strokeOpacity="0.65"
+                strokeWidth={Math.max(bounds.width / 300000, 2)}
+                strokeDasharray={`${Math.max(bounds.width / 100000, 6)} ${Math.max(bounds.width / 70000, 8)}`}
+              />
+            </g>
           ) : null}
           {currentFrame?.zones?.blackzone ? (
-            <circle
-              cx={currentFrame.zones.blackzone.x}
-              cy={currentFrame.zones.blackzone.y}
-              r={currentFrame.zones.blackzone.radius}
-              fill="var(--foreground)"
-              fillOpacity="0.08"
-              stroke="var(--foreground)"
-              strokeOpacity="0.55"
-              strokeWidth={Math.max(bounds.width / 300000, 2)}
-              strokeDasharray={`${Math.max(bounds.width / 80000, 6)} ${Math.max(bounds.width / 50000, 10)}`}
-            />
+            <g>
+              <title>特殊区</title>
+              <circle
+                cx={currentFrame.zones.blackzone.x}
+                cy={currentFrame.zones.blackzone.y}
+                r={currentFrame.zones.blackzone.radius}
+                fill="var(--foreground)"
+                fillOpacity="0.08"
+                stroke="var(--foreground)"
+                strokeOpacity="0.55"
+                strokeWidth={Math.max(bounds.width / 300000, 2)}
+                strokeDasharray={`${Math.max(bounds.width / 80000, 6)} ${Math.max(bounds.width / 50000, 10)}`}
+              />
+            </g>
           ) : null}
           {currentFrame?.zones?.bluezone ? (
-            <circle
-              cx={currentFrame.zones.bluezone.x}
-              cy={currentFrame.zones.bluezone.y}
-              r={currentFrame.zones.bluezone.radius}
-              fill="var(--chart-2)"
-              fillOpacity="0.06"
-              stroke="var(--chart-2)"
-              strokeOpacity="0.75"
-              strokeWidth={Math.max(bounds.width / 320000, 2)}
-            />
+            <g>
+              <title>蓝圈</title>
+              <circle
+                cx={currentFrame.zones.bluezone.x}
+                cy={currentFrame.zones.bluezone.y}
+                r={currentFrame.zones.bluezone.radius}
+                fill="var(--chart-2)"
+                fillOpacity="0.06"
+                stroke="var(--chart-2)"
+                strokeOpacity="0.75"
+                strokeWidth={Math.max(bounds.width / 320000, 2)}
+              />
+            </g>
           ) : null}
           {currentFrame?.zones?.safezone ? (
-            <circle
-              cx={currentFrame.zones.safezone.x}
-              cy={currentFrame.zones.safezone.y}
-              r={currentFrame.zones.safezone.radius}
-              fill="none"
-              stroke="var(--foreground)"
-              strokeOpacity="0.8"
-              strokeWidth={Math.max(bounds.width / 320000, 2)}
-              strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 60000, 10)}`}
-            />
+            <g>
+              <title>白圈</title>
+              <circle
+                cx={currentFrame.zones.safezone.x}
+                cy={currentFrame.zones.safezone.y}
+                r={currentFrame.zones.safezone.radius}
+                fill="none"
+                stroke="var(--foreground)"
+                strokeOpacity="0.8"
+                strokeWidth={Math.max(bounds.width / 320000, 2)}
+                strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 60000, 10)}`}
+              />
+            </g>
           ) : null}
           {selectedPath ? (
             <polyline
@@ -849,6 +867,19 @@ function ReplayMap({
               跟踪：{selectedPlayer.name}
             </Badge>
           ) : null}
+          {analysis.flightPath.length > 0 ? (
+            <Badge variant="outline" className="bg-background/85">
+              航线 {analysis.flightPath.length} 点
+            </Badge>
+          ) : null}
+          {selectedPathPointCount > 0 ? (
+            <Badge variant="outline" className="bg-background/85">
+              轨迹 {selectedPathPointCount} 点
+            </Badge>
+          ) : null}
+          <Badge variant="outline" className="bg-background/85">
+            {hasCurrentZones ? "圈层已加载" : "圈层等待"}
+          </Badge>
           <Badge variant="outline" className="bg-background/85">
             {currentFrame
               ? `T+${formatTime(currentFrame.elapsedSeconds)}`
@@ -867,9 +898,23 @@ function ReplayMap({
           <span className="h-0 w-4 border-t-2 border-chart-1" />
           运动轨迹：{selectedPlayer?.name ?? "已选玩家"}
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
-          <span className="size-2 rounded-full border border-chart-2" />
-          圈：蓝圈 / 白圈 / 红区 / 特殊区
+        <span className="inline-flex items-center gap-2 rounded-md border bg-background/85 px-2 py-1">
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full border border-chart-2" />
+            蓝圈
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full border border-foreground" />
+            白圈
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full bg-destructive" />
+            红区
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="size-2 rounded-full border border-foreground border-dashed" />
+            特殊区
+          </span>
         </span>
         {visibleCarePackages.length ? (
           <span className="rounded-md border bg-background/85 px-2 py-1">
