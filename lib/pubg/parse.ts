@@ -783,11 +783,9 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       .filter(
         (change) =>
           change.status !== undefined ||
-          change.vehicleType !== undefined ||
           change.zones !== undefined ||
           change.alivePlayers !== undefined ||
-          change.aliveTeams !== undefined ||
-          change.phase !== undefined
+          change.aliveTeams !== undefined
       )
       .map((change) => change.elapsedSeconds)
   )
