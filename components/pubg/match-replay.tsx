@@ -1578,6 +1578,58 @@ function ReplayEventMarkers({
   )
 }
 
+function ReplayZoneMarkers({
+  frames,
+  duration,
+  onSeek,
+}: {
+  frames: ReplayFrame[]
+  duration: number
+  onSeek: (seconds: number) => void
+}) {
+  const markers: ReplayFrame[] = []
+  let previousPhaseKey: string | undefined
+
+  for (const frame of frames) {
+    if (!frame.zones) continue
+    const phaseKey =
+      frame.phase === undefined ? "unknown" : String(frame.phase)
+    if (phaseKey === previousPhaseKey) continue
+    markers.push(frame)
+    previousPhaseKey = phaseKey
+  }
+  if (duration <= 0 || markers.length === 0) return null
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-1/2 h-6 -translate-y-1/2">
+      {markers.map((frame, index) => {
+        const position = Math.min(
+          100,
+          Math.max(0, (frame.elapsedSeconds / duration) * 100)
+        )
+        const phaseLabel =
+          frame.phase === undefined
+            ? "圈层开始"
+            : `圈层阶段 ${formatPhase(frame.phase)}`
+        return (
+          <Button
+            key={`${frame.elapsedSeconds}-${index}`}
+            type="button"
+            size="icon-xs"
+            variant="outline"
+            className="pointer-events-auto absolute top-1/2 -translate-x-1/2 translate-y-2 rounded-sm border-blue-500 bg-background"
+            style={{ left: `${position}%` }}
+            aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
+            onClick={() => onSeek(frame.elapsedSeconds)}
+          >
+            <span className="size-1.5 rotate-45 rounded-[1px] bg-blue-500" />
+          </Button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function MatchReplay({
   match,
   analysis,
@@ -1844,6 +1896,14 @@ export function MatchReplay({
                           setTime(seconds)
                         }}
                       />
+                      <ReplayZoneMarkers
+                        frames={analysis.replayFrames}
+                        duration={duration}
+                        onSeek={(seconds) => {
+                          setPlaying(false)
+                          setTime(seconds)
+                        }}
+                      />
                     </div>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
@@ -1876,6 +1936,10 @@ export function MatchReplay({
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2 rounded-sm border border-chart-4" />{" "}
                         载具移动
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="size-2 rotate-45 rounded-[1px] bg-blue-500" />{" "}
+                        圈层阶段
                       </span>
                       <span className="ml-auto inline-flex items-center gap-1.5">
                         <CrosshairIcon className="size-3.5" />
