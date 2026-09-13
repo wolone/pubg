@@ -245,6 +245,10 @@ function isUserTelemetryCharacter(character: Record<string, unknown>) {
   return !type || /user/i.test(type)
 }
 
+function isBotAccountId(id: string) {
+  return /^(?:ai|npc)\./i.test(id)
+}
+
 function carePackageItems(itemPackage: Record<string, unknown> | undefined) {
   if (!itemPackage || !Array.isArray(itemPackage.items)) return undefined
   const items = itemPackage.items
@@ -717,7 +721,11 @@ export function parseTelemetry(
       if (right === playerId) return 1
       return (positionCounts.get(right) ?? 0) - (positionCounts.get(left) ?? 0)
     })
-    .filter((id) => id === playerId || (positionCounts.get(id) ?? 0) > 0)
+    .filter(
+      (id) =>
+        id === playerId ||
+        (!isBotAccountId(id) && (positionCounts.get(id) ?? 0) > 0)
+    )
     .slice(0, MAX_REPLAY_PLAYERS)
   const replayPlayers = replayPlayerIds
     .map((id) => replayPlayersById.get(id))

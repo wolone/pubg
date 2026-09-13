@@ -790,6 +790,49 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("excludes ai and npc accounts from the human replay roster", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 1,
+          character: {
+            accountId: "account.human",
+            name: "Human",
+            location: { x: 100, y: 100 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 1,
+          character: {
+            accountId: "ai.123",
+            name: "Bot",
+            location: { x: 200, y: 200 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 1,
+          character: {
+            accountId: "npc.456",
+            name: "Npc",
+            location: { x: 300, y: 300 },
+          },
+        },
+      ],
+      "account.human",
+      "match-human-roster"
+    )
+
+    expect(analysis.replayPlayers).toEqual([
+      { id: "account.human", name: "Human" },
+    ])
+    expect(analysis.replayFrames.flatMap((frame) => frame.players)).toEqual([
+      [0, 100, 100, "alive", 100],
+    ])
+  })
+
   it("keeps downed-state damage neutral when telemetry repeats the victim", () => {
     const analysis = parseTelemetry(
       [
