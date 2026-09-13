@@ -238,10 +238,19 @@ function interpolateZones(
   }
 }
 
+function frameAtTime(frame: ReplayFrame, elapsedSeconds: number) {
+  if (frame.elapsedSeconds === elapsedSeconds) return frame
+  return { ...frame, elapsedSeconds }
+}
+
 function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
   if (frames.length === 0) return null
-  if (elapsedSeconds <= frames[0]!.elapsedSeconds) return frames[0]!
-  if (elapsedSeconds >= frames.at(-1)!.elapsedSeconds) return frames.at(-1)!
+  if (elapsedSeconds <= frames[0]!.elapsedSeconds) {
+    return frameAtTime(frames[0]!, elapsedSeconds)
+  }
+  if (elapsedSeconds >= frames.at(-1)!.elapsedSeconds) {
+    return frameAtTime(frames.at(-1)!, elapsedSeconds)
+  }
 
   let rightIndex = 1
   while (
