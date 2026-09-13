@@ -2447,6 +2447,13 @@ export function MatchReplay({
                       </ToggleGroup>
                     </div>
                     <div className="relative pt-20 pb-12">
+                      <div
+                        className="pointer-events-none absolute inset-y-0 z-10 w-px bg-foreground/70"
+                        style={{
+                          left: `${Math.min(100, Math.max(0, (currentTime / Math.max(duration, 1)) * 100))}%`,
+                        }}
+                        aria-hidden="true"
+                      />
                       <Slider
                         value={[currentTime]}
                         min={0}
