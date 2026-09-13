@@ -391,39 +391,32 @@ function ReplayMap({
     (player) => player.id === selectedPlayerId
   )
   const visibleTime = currentFrame?.elapsedSeconds ?? duration
-  const selectedPlayer = analysis.replayPlayers[selectedIndex]
-  const selectedPath = React.useMemo(() => {
+  const trackedPlayer = analysis.replayPlayers[targetIndex]
+  const trackedPath = React.useMemo(() => {
     const framePath = analysis.replayFrames.flatMap((frame) => {
       if (frame.elapsedSeconds > visibleTime) return []
       const player = frame.players.find(
-        ([playerIndex]) => playerIndex === selectedIndex
+        ([playerIndex]) => playerIndex === targetIndex
       )
       return player ? [`${player[1]},${player[2]}`] : []
     })
     const currentPlayer = currentFrame?.players.find(
-      ([playerIndex]) => playerIndex === selectedIndex
+      ([playerIndex]) => playerIndex === targetIndex
     )
     if (currentPlayer) {
       const currentPoint = `${currentPlayer[1]},${currentPlayer[2]}`
       if (framePath.at(-1) !== currentPoint) framePath.push(currentPoint)
     }
     if (framePath.length > 0) return framePath.join(" ")
-    return analysis.replayFrames.length === 0 &&
-      selectedPlayerId === analysis.playerId
-      ? path
-      : ""
+    return analysis.replayFrames.length === 0 ? path : ""
   }, [
-    analysis.playerId,
     analysis.replayFrames,
     currentFrame,
     path,
-    selectedIndex,
-    selectedPlayerId,
+    targetIndex,
     visibleTime,
   ])
-  const selectedPathPointCount = selectedPath
-    ? selectedPath.split(" ").length
-    : 0
+  const trackedPathPointCount = trackedPath ? trackedPath.split(" ").length : 0
   const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(Boolean)
   const visibleKills = analysis.timeline.filter(
     (kill) =>
@@ -538,6 +531,31 @@ function ReplayMap({
                 strokeWidth={Math.max(bounds.width / 816000, 1)}
               />
             </pattern>
+            {showZones && currentFrame?.zones?.safezone ? (
+              <mask
+                id="replay-bluezone-mask"
+                x={bounds.minX}
+                y={bounds.minY}
+                width={bounds.width}
+                height={bounds.height}
+                maskUnits="userSpaceOnUse"
+                maskContentUnits="userSpaceOnUse"
+              >
+                <rect
+                  x={bounds.minX}
+                  y={bounds.minY}
+                  width={bounds.width}
+                  height={bounds.height}
+                  fill="white"
+                />
+                <circle
+                  cx={currentFrame.zones.safezone.x}
+                  cy={currentFrame.zones.safezone.y}
+                  r={currentFrame.zones.safezone.radius}
+                  fill="black"
+                />
+              </mask>
+            ) : null}
           </defs>
           <rect
             x={bounds.minX}
@@ -641,6 +659,11 @@ function ReplayMap({
                 stroke="#60a5fa"
                 strokeOpacity="0.95"
                 strokeWidth={2.5}
+                mask={
+                  currentFrame.zones.safezone
+                    ? "url(#replay-bluezone-mask)"
+                    : undefined
+                }
                 vectorEffect="non-scaling-stroke"
               />
             </g>
@@ -671,13 +694,11 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {showTrajectory && selectedPath ? (
+          {showTrajectory && trackedPath ? (
             <polyline
-              points={selectedPath}
+              points={trackedPath}
               fill="none"
-              stroke={
-                selectedPlayerId === analysis.playerId ? "#22d3ee" : "#f59e0b"
-              }
+              stroke="#22d3ee"
               strokeOpacity="0.45"
               strokeWidth={2.5}
               strokeLinecap="round"
@@ -895,9 +916,9 @@ function ReplayMap({
           {MAP_LABELS[mapName] ?? mapName} · 战术视图
         </Badge>
         <div className="flex flex-wrap justify-end gap-2">
-          {selectedPlayer ? (
+          {trackedPlayer ? (
             <Badge variant="outline" className="bg-background/85">
-              跟踪：{selectedPlayer.name}
+              跟踪：{trackedPlayer.name}
             </Badge>
           ) : null}
           {analysis.flightPath.length > 0 ? (
@@ -905,9 +926,9 @@ function ReplayMap({
               航线 {analysis.flightPath.length} 点
             </Badge>
           ) : null}
-          {selectedPathPointCount > 0 ? (
+          {trackedPathPointCount > 0 ? (
             <Badge variant="outline" className="bg-background/85">
-              轨迹 {selectedPathPointCount} 点
+              轨迹 {trackedPathPointCount} 点
             </Badge>
           ) : null}
           <Badge variant="outline" className="bg-background/85">
@@ -955,7 +976,7 @@ function ReplayMap({
         ) : null}
         <span className="inline-flex items-center gap-1.5 rounded-md border bg-background/85 px-2 py-1">
           <span className="h-0 w-4 border-t-2 border-cyan-400" />
-          运动轨迹：{selectedPlayer?.name ?? "已选玩家"}
+          运动轨迹：{trackedPlayer?.name ?? "跟踪玩家"}
         </span>
         <span className="inline-flex items-center gap-2 rounded-md border bg-background/85 px-2 py-1">
           <span className="inline-flex items-center gap-1">
@@ -1605,15 +1626,23 @@ function ReplayZoneMarkers({
   duration: number
   onSeek: (seconds: number) => void
 }) {
+  const minimumMarkerGapSeconds = 30
   const markers: ReplayFrame[] = []
   let previousPhaseKey: string | undefined
+  let previousMarkerTime = Number.NEGATIVE_INFINITY
 
   for (const frame of frames) {
     if (!frame.zones) continue
     const phaseKey = frame.phase === undefined ? "unknown" : String(frame.phase)
-    if (phaseKey === previousPhaseKey) continue
+    if (
+      phaseKey === previousPhaseKey ||
+      frame.elapsedSeconds - previousMarkerTime < minimumMarkerGapSeconds
+    ) {
+      continue
+    }
     markers.push(frame)
     previousPhaseKey = phaseKey
+    previousMarkerTime = frame.elapsedSeconds
   }
   if (duration <= 0 || markers.length === 0) return null
 

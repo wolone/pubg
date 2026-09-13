@@ -564,6 +564,45 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("does not treat ordinary early-game positions as the flight path", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 0,
+          phase: 0.1,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200, z: 7000 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          phase: 0.1,
+          character: {
+            accountId: "account.123",
+            location: { x: 120, y: 220, z: 5000 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          phase: 0.1,
+          character: {
+            accountId: "account.123",
+            location: { x: 140, y: 240, z: 1000 },
+          },
+          vehicle: { vehicleType: "TransportAircraft" },
+        },
+      ],
+      "account.123",
+      "match-flight-path-phase"
+    )
+
+    expect(analysis.flightPath).toEqual([{ x: 140, y: 240, z: 1000 }])
+  })
+
   it("rounds replay map coordinates without changing event locations", () => {
     const analysis = parseTelemetry(
       [

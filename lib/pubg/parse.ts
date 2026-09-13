@@ -317,9 +317,7 @@ export function parseTelemetry(
     const phase = replayPhaseOf(event)
     const vehicleType = vehicleTypeOf(vehicle)
     const isFlightPosition =
-      type === "LogPlayerPosition" &&
-      location &&
-      (isTransportAircraft(vehicle) || isAirplanePhase(phase))
+      type === "LogPlayerPosition" && location && isTransportAircraft(vehicle)
 
     if (isFlightPosition) {
       const bucket = Math.max(0, Math.round(elapsedSeconds))
@@ -643,10 +641,6 @@ function isTransportAircraft(vehicle: Record<string, unknown> | undefined) {
     stringValue(vehicle.vehicleId, "")
   )
   return /transportaircraft/i.test(vehicleType)
-}
-
-function isAirplanePhase(phase: number | undefined) {
-  return phase !== undefined && phase > 0 && phase < 0.2
 }
 
 function replayPhaseOf(event: Record<string, unknown>) {
