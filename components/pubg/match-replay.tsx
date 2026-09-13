@@ -42,6 +42,7 @@ import { Slider } from "@/components/ui/slider"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import {
   ReplayMap as ReplayMapV2,
+  interpolateReplayTrajectory,
   type ReplayMapLayer,
   type ReplayTimelineLayer,
 } from "@/components/pubg/replay-map"
@@ -244,21 +245,59 @@ function isReplayZoneActive(frame: ReplayFrame) {
   return frame.phase === undefined || frame.phase >= 1
 }
 
-function frameAtTime(frame: ReplayFrame, elapsedSeconds: number) {
-  if (frame.elapsedSeconds === elapsedSeconds) return frame
-  return { ...frame, elapsedSeconds }
+function frameAtTime(
+  frame: ReplayFrame,
+  elapsedSeconds: number,
+  targetPlayerIndex?: number,
+  targetLocation?: { x: number; y: number } | null
+) {
+  const nextFrame =
+    frame.elapsedSeconds === elapsedSeconds
+      ? frame
+      : { ...frame, elapsedSeconds }
+  if (targetPlayerIndex === undefined || !targetLocation) return nextFrame
+  if (!nextFrame.players.some((player) => player[0] === targetPlayerIndex)) {
+    return nextFrame
+  }
+  const players = nextFrame.players.map((player) =>
+    player[0] === targetPlayerIndex
+      ? [
+          player[0],
+          targetLocation.x,
+          targetLocation.y,
+          player[3],
+          ...player.slice(4),
+        ] as ReplayFramePlayer
+      : player
+  )
+  return { ...nextFrame, players }
 }
 
-export function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) {
+export function interpolateFrame(
+  frames: ReplayFrame[],
+  elapsedSeconds: number,
+  targetPlayerIndex?: number,
+  targetLocation?: { x: number; y: number } | null
+) {
   if (frames.length === 0) return null
   if (elapsedSeconds < frames[0]!.elapsedSeconds) {
     return null
   }
   if (elapsedSeconds === frames[0]!.elapsedSeconds) {
-    return frameAtTime(frames[0]!, elapsedSeconds)
+    return frameAtTime(
+      frames[0]!,
+      elapsedSeconds,
+      targetPlayerIndex,
+      targetLocation
+    )
   }
   if (elapsedSeconds >= frames.at(-1)!.elapsedSeconds) {
-    return frameAtTime(frames.at(-1)!, elapsedSeconds)
+    return frameAtTime(
+      frames.at(-1)!,
+      elapsedSeconds,
+      targetPlayerIndex,
+      targetLocation
+    )
   }
 
   let rightIndex = 1
@@ -330,7 +369,12 @@ export function interpolateFrame(frames: ReplayFrame[], elapsedSeconds: number) 
   if (alivePlayers !== undefined) frame.alivePlayers = alivePlayers
   if (aliveTeams !== undefined) frame.aliveTeams = aliveTeams
   if (phase !== undefined) frame.phase = phase
-  return frame
+  return frameAtTime(
+    frame,
+    elapsedSeconds,
+    targetPlayerIndex,
+    targetLocation
+  )
 }
 
 function currentStates(frame: ReplayFrame | null) {
@@ -1542,6 +1586,9 @@ export function MatchReplay({
     MatchAnalysis["timeline"][number] | null
   >(null)
   const currentTimeRef = React.useRef(0)
+  const targetIndex = analysis.replayPlayers.findIndex(
+    (player) => player.id === analysis.playerId
+  )
 
   React.useEffect(() => {
     currentTimeRef.current = currentTime
@@ -1569,9 +1616,19 @@ export function MatchReplay({
     return () => cancelAnimationFrame(animationFrame)
   }, [duration, playing, speed])
 
+  const targetLocation = React.useMemo(
+    () => interpolateReplayTrajectory(analysis.trajectory, currentTime),
+    [analysis.trajectory, currentTime]
+  )
   const currentFrame = React.useMemo(
-    () => interpolateFrame(analysis.replayFrames, currentTime),
-    [analysis.replayFrames, currentTime]
+    () =>
+      interpolateFrame(
+        analysis.replayFrames,
+        currentTime,
+        targetIndex >= 0 ? targetIndex : undefined,
+        targetLocation
+      ),
+    [analysis.replayFrames, currentTime, targetIndex, targetLocation]
   )
 
   const setTime = React.useCallback(

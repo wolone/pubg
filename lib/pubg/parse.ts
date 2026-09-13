@@ -44,6 +44,7 @@ const MAX_REPLAY_PLAYERS = 100
 // retaining enough frames for smooth interpolation between official events.
 const MAX_REPLAY_PLAYER_FRAMES = 64 * 600
 const MAX_REPLAY_FRAME_COUNT = 384
+const MAX_REPLAY_TRAJECTORY_POINTS = 720
 
 const REPLAY_ATTACK_EVENT_TYPES = new Set([
   "LogPlayerAttack",
@@ -657,13 +658,19 @@ export function parseTelemetry(
       }
     }
 
-    if (
-      actor === playerId &&
-      location &&
-      !isFlightPosition &&
-      type === "LogPlayerPosition"
-    ) {
-      trajectory.push({ ...location, elapsedSeconds })
+    const targetTrajectoryLocation =
+      !isFlightPosition && characterId === playerId && location
+        ? location
+        : !isFlightPosition && actor === playerId && location
+          ? location
+          : target === playerId
+            ? victimLocation
+            : null
+    if (targetTrajectoryLocation) {
+      trajectory.push({
+        ...targetTrajectoryLocation,
+        elapsedSeconds,
+      })
     }
 
     const isRelevant =
@@ -726,7 +733,7 @@ export function parseTelemetry(
       120,
       playerId
     ),
-    trajectory: downsampleTrajectory(trajectory, 240),
+    trajectory: downsampleTrajectory(trajectory, MAX_REPLAY_TRAJECTORY_POINTS),
     flightPath: downsample(buildFlightPath(flightPathBuckets), 96),
     carePackages,
     replayPlayers,

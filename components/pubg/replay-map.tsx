@@ -13,6 +13,7 @@ import type {
   ReplayPlayerStatus,
   ReplayCarePackageEvent,
   ReplayZone,
+  ReplayTrajectoryPoint,
 } from "@/lib/pubg/types"
 
 export type ReplayMapLayer =
@@ -124,6 +125,43 @@ function mapEventLocation(event: MatchAnalysis["timeline"][number]) {
     return event.targetLocation ?? event.location
   }
   return event.location
+}
+
+export function interpolateReplayTrajectory(
+  points: ReplayTrajectoryPoint[],
+  elapsedSeconds: number
+) {
+  const ordered = points
+    .filter(
+      (point): point is ReplayTrajectoryPoint & { elapsedSeconds: number } =>
+        point.elapsedSeconds !== undefined &&
+        Number.isFinite(point.elapsedSeconds)
+    )
+    .sort((left, right) => left.elapsedSeconds - right.elapsedSeconds)
+  if (ordered.length === 0 || elapsedSeconds < ordered[0]!.elapsedSeconds) {
+    return null
+  }
+  if (ordered.length === 1 || elapsedSeconds >= ordered.at(-1)!.elapsedSeconds) {
+    const point = ordered.at(-1)!
+    return { x: point.x, y: point.y }
+  }
+
+  let rightIndex = 1
+  while (
+    rightIndex < ordered.length &&
+    ordered[rightIndex]!.elapsedSeconds < elapsedSeconds
+  ) {
+    rightIndex += 1
+  }
+  const left = ordered[rightIndex - 1]!
+  const right = ordered[rightIndex]!
+  const span = right.elapsedSeconds - left.elapsedSeconds
+  if (span <= 0) return { x: right.x, y: right.y }
+  const progress = (elapsedSeconds - left.elapsedSeconds) / span
+  return {
+    x: left.x + (right.x - left.x) * progress,
+    y: left.y + (right.y - left.y) * progress,
+  }
 }
 
 function isReplayZoneActive(frame: ReplayFrame) {

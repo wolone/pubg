@@ -3,10 +3,28 @@ import { describe, expect, it } from "vitest"
 import { interpolateFrame } from "@/components/pubg/match-replay"
 import {
   activeCarePackagesAtTime,
+  interpolateReplayTrajectory,
   isGunDamageEvent,
 } from "@/components/pubg/replay-map"
 
 describe("replay frame synchronization", () => {
+  it("interpolates the tracked player from official location samples", () => {
+    const points = [
+      { x: 100, y: 200, elapsedSeconds: 10 },
+      { x: 300, y: 600, elapsedSeconds: 20 },
+    ]
+
+    expect(interpolateReplayTrajectory(points, 5)).toBeNull()
+    expect(interpolateReplayTrajectory(points, 15)).toEqual({
+      x: 200,
+      y: 400,
+    })
+    expect(interpolateReplayTrajectory(points, 25)).toEqual({
+      x: 300,
+      y: 600,
+    })
+  })
+
   it("only treats official gun damage as a replay tracer", () => {
     expect(
       isGunDamageEvent({

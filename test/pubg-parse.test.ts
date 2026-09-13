@@ -88,7 +88,12 @@ describe("PUBG JSON:API parser", () => {
       match.participants
     )
     expect(analysis.kills).toHaveLength(1)
-    expect(analysis.trajectory).toHaveLength(2)
+    expect(analysis.trajectory).toHaveLength(3)
+    expect(analysis.trajectory[1]).toMatchObject({
+      x: 120,
+      y: 240,
+      elapsedSeconds: 180,
+    })
     expect(analysis.timeline).toHaveLength(1)
     expect(analysis.timeline[0]?.elapsedSeconds).toBe(180)
     expect(analysis.timeline[0]?.targetLocation).toMatchObject({
@@ -868,7 +873,9 @@ describe("PUBG JSON:API parser", () => {
       "alive",
       100,
     ])
-    expect(analysis.trajectory).toEqual([])
+    expect(analysis.trajectory).toEqual([
+      { x: 500, y: 600, z: 1200, elapsedSeconds: 8 },
+    ])
   })
 
   it("does not describe zero damage as effective damage", () => {
@@ -1075,6 +1082,7 @@ describe("PUBG JSON:API parser", () => {
 
     expect(analysis.trajectory).toEqual([
       { x: 100, y: 200, z: 90000, elapsedSeconds: 10 },
+      { x: 900, y: 1000, z: 90000, elapsedSeconds: 15 },
       { x: 200, y: 300, z: 2000, elapsedSeconds: 20 },
     ])
     expect(
@@ -1491,7 +1499,9 @@ describe("PUBG JSON:API parser", () => {
       location: { x: 200, y: 300 },
       message: "TestPlayer 开火",
     })
-    expect(analysis.trajectory).toEqual([])
+    expect(analysis.trajectory).toEqual([
+      { x: 200, y: 300, elapsedSeconds: 18 },
+    ])
   })
 
   it("tracks vehicle state without retaining raw vehicle telemetry", () => {
@@ -1695,6 +1705,7 @@ describe("PUBG JSON:API parser", () => {
       "alive",
     ])
     expect(analysis.trajectory).toEqual([
+      { x: 900, y: 1000, z: 2000, elapsedSeconds: 11 },
       { x: 300, y: 400, z: 30000, elapsedSeconds: 20 },
     ])
   })
