@@ -719,13 +719,15 @@ function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
   const value = event.gameState
   if (!value || typeof value !== "object") return null
   const gameState = value as Record<string, unknown>
-  const bluezone = replayZoneOf(
-    gameState.safetyZonePosition,
-    gameState.safetyZoneRadius
+  const safetyRadius = numberValue(gameState.safetyZoneRadius, Number.NaN)
+  const warningRadius = numberValue(
+    gameState.poisonGasWarningRadius,
+    Number.NaN
   )
+  const bluezone = replayZoneOf(gameState.safetyZonePosition, safetyRadius)
   const safezone = replayZoneOf(
     gameState.poisonGasWarningPosition,
-    gameState.poisonGasWarningRadius
+    normalizeWarningRadius(safetyRadius, warningRadius)
   )
   const redzone = replayZoneOf(
     gameState.redZonePosition,
@@ -737,6 +739,18 @@ function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
   )
   if (!bluezone && !safezone && !redzone && !blackzone) return null
   return { bluezone, safezone, redzone, blackzone }
+}
+
+function normalizeWarningRadius(safetyRadius: number, warningRadius: number) {
+  if (
+    Number.isFinite(safetyRadius) &&
+    Number.isFinite(warningRadius) &&
+    warningRadius > 0 &&
+    safetyRadius / warningRadius >= 100
+  ) {
+    return warningRadius * 1000
+  }
+  return warningRadius
 }
 
 function replayZoneOf(position: unknown, radius: unknown) {

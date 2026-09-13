@@ -383,6 +383,32 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.replayFrames.at(-1)?.phase).toBe(6)
   })
 
+  it("normalizes a final safe-zone radius with a telemetry unit shift", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogGameStatePeriodic",
+          elapsedTime: 10,
+          gameState: {
+            safetyZonePosition: { x: 400000, y: 400000 },
+            safetyZoneRadius: 6788.203125,
+            poisonGasWarningPosition: { x: 400000, y: 400000 },
+            poisonGasWarningRadius: 6.788203239440918,
+          },
+        },
+      ],
+      "account.123",
+      "match-final-zone-radius"
+    )
+
+    expect(analysis.replayFrames[0]?.zones).toEqual({
+      bluezone: { x: 400000, y: 400000, radius: 6788.203125 },
+      safezone: { x: 400000, y: 400000, radius: 6788.203239440918 },
+      redzone: null,
+      blackzone: null,
+    })
+  })
+
   it("adds care package events to the replay timeline with map locations", () => {
     const analysis = parseTelemetry(
       [
