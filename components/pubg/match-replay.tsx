@@ -437,6 +437,24 @@ type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
 type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "state" | "zones"
 
+function replayTimelineKind(
+  event: MatchAnalysis["timeline"][number]
+): Exclude<ReplayTimelineLayer, "zones"> | null {
+  if (event.type.includes("Kill") || event.type.includes("Death")) {
+    return "kills"
+  }
+  if (event.type.includes("Damage")) return "damage"
+  if (event.type.includes("Attack")) return "attacks"
+  if (
+    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
+      event.type
+    )
+  ) {
+    return "state"
+  }
+  return null
+}
+
 function MapEventMarker({ children }: { children: React.ReactNode }) {
   return <g>{children}</g>
 }
@@ -1443,18 +1461,24 @@ function ReplayTimeline({
   onSeek,
   playerNames,
   selectedPlayerId,
+  visibleKinds,
 }: {
   events: MatchAnalysis["timeline"]
   currentTime: number
   onSeek: (seconds: number) => void
   playerNames: Map<string, string>
   selectedPlayerId: string
+  visibleKinds: ReplayTimelineLayer[]
 }) {
   const [filter, setFilter] = React.useState<TimelineFilter>("all")
   const [selectedEvent, setSelectedEvent] = React.useState<
     MatchAnalysis["timeline"][number] | null
   >(null)
-  const filteredEvents = events.filter((event) =>
+  const layerEvents = events.filter((event) => {
+    const kind = replayTimelineKind(event)
+    return kind !== null && visibleKinds.includes(kind)
+  })
+  const filteredEvents = layerEvents.filter((event) =>
     matchesTimelineFilter(event, filter, selectedPlayerId)
   )
   const activeIndex = filteredEvents.reduce(
@@ -1478,7 +1502,7 @@ function ReplayTimeline({
           <div>
             <h3 className="text-sm font-semibold">事件时间线</h3>
             <p className="text-xs text-muted-foreground">
-              点击事件跳转到回放位置
+              点击事件跳转到回放位置；上方事件开关同步控制显示
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1757,21 +1781,10 @@ function ReplayEventMarkers({
   const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
   const markers = events
     .flatMap((event) => {
-      const kind =
-        event.type.includes("Kill") || event.type.includes("Death")
-          ? "kills"
-          : event.type.includes("Damage")
-            ? "damage"
-            : event.type.includes("Attack")
-              ? "attacks"
-              : /Groggy|Knock|Revive|Rescue|CarePackage|Vehicle/.test(
-                    event.type
-                  )
-                ? "state"
-                : undefined
+      const kind = replayTimelineKind(event)
       if (
         event.elapsedSeconds === undefined ||
-        kind === undefined ||
+        kind === null ||
         !visibleKinds.includes(kind)
       ) {
         return []
@@ -2282,6 +2295,7 @@ export function MatchReplay({
             currentTime={currentTime}
             playerNames={playerNames}
             selectedPlayerId={selectedPlayerId}
+            visibleKinds={visibleTimelineLayers}
             onSeek={(seconds) => {
               setPlaying(false)
               setTime(seconds)
