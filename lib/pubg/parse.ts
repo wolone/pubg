@@ -41,6 +41,7 @@ const MAX_REPLAY_PLAYERS = 100
 // Keep the normalized replay snapshot safely below D1's per-value limit while
 // retaining enough frames for smooth interpolation between official events.
 const MAX_REPLAY_PLAYER_FRAMES = 48 * 600
+const MAX_REPLAY_FRAME_COUNT = 320
 
 function seasonDisplayName(id: string): string {
   const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
@@ -828,6 +829,31 @@ function replayZoneOf(position: unknown, radius: unknown) {
   return { x: location.x, y: location.y, radius: size }
 }
 
+function sampleFrameTimes(values: number[], count: number) {
+  if (values.length <= count) return values
+  return Array.from({ length: count }, (_, index) => {
+    const position = Math.round((index * (values.length - 1)) / (count - 1))
+    return values[position]!
+  })
+}
+
+function limitFrameTimes(
+  values: number[],
+  importantTimes: Set<number>,
+  count: number
+) {
+  if (values.length <= count) return values
+  const important = values.filter((value) => importantTimes.has(value))
+  if (important.length >= count) return sampleFrameTimes(important, count)
+  const regular = values.filter((value) => !importantTimes.has(value))
+  return Array.from(
+    new Set([
+      ...important,
+      ...sampleFrameTimes(regular, count - important.length),
+    ])
+  ).sort((left, right) => left - right)
+}
+
 function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   if (changes.length === 0) {
     return { frames: [] as ReplayFrame[], durationSeconds: 0 }
@@ -838,14 +864,14 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     .sort((left, right) => left.elapsedSeconds - right.elapsedSeconds)
   const durationSeconds = Math.max(0, sortedChanges.at(-1)?.elapsedSeconds ?? 0)
   const maxFrameCount = Math.min(
-    600,
+    MAX_REPLAY_FRAME_COUNT,
     Math.max(
-      240,
+      180,
       Math.floor(MAX_REPLAY_PLAYER_FRAMES / Math.max(playerIds.length, 1))
     )
   )
   const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
-  const exactFrameTimes = new Set(
+  const exactFrameTimes = new Set<number>(
     sortedChanges
       .filter(
         (change) =>
@@ -856,14 +882,22 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
       )
       .map((change) => change.elapsedSeconds)
   )
-  const frameTimes = new Set<number>(exactFrameTimes)
+  const regularFrameTimes = new Set<number>()
   for (
     let elapsedSeconds = 0;
     elapsedSeconds <= durationSeconds;
     elapsedSeconds += stepSeconds
   ) {
-    frameTimes.add(elapsedSeconds)
+    regularFrameTimes.add(elapsedSeconds)
   }
+  regularFrameTimes.add(durationSeconds)
+  const frameTimes = limitFrameTimes(
+    Array.from(new Set([...regularFrameTimes, ...exactFrameTimes])).sort(
+      (left, right) => left - right
+    ),
+    exactFrameTimes,
+    maxFrameCount
+  )
   const playerIndexById = new Map(playerIds.map((id, index) => [id, index]))
   const states = new Map<string, ReplayState>()
   const frames: ReplayFrame[] = []
@@ -873,9 +907,7 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
   let phase: number | undefined
   let changeIndex = 0
 
-  for (const elapsedSeconds of Array.from(frameTimes).sort(
-    (left, right) => left - right
-  )) {
+  for (const elapsedSeconds of frameTimes) {
     while (
       changeIndex < sortedChanges.length &&
       sortedChanges[changeIndex]!.elapsedSeconds <= elapsedSeconds
