@@ -337,6 +337,14 @@ export function ReplayMap({
     () => currentStates(currentFrame),
     [currentFrame]
   )
+  const vehicles = React.useMemo(
+    () =>
+      new Map(
+        currentFrame?.vehicles?.map((vehicle) => [vehicle.playerIndex, vehicle]) ??
+          []
+      ),
+    [currentFrame]
+  )
   const targetIndex = analysis.replayPlayers.findIndex(
     (player) => player.id === analysis.playerId
   )
@@ -917,6 +925,7 @@ export function ReplayMap({
               return null
             }
             const point = model.projectPoint({ x: state[1], y: state[2] })
+            const vehicle = vehicles.get(playerIndex)
             const markerScale = Math.min(
               2.8,
               1 + Math.log2(Math.max(mapScale, 1)) * 0.32
@@ -981,7 +990,7 @@ export function ReplayMap({
                     strokeDasharray={`${markerRadius(7, mapScale, viewportSize, model)} ${markerRadius(6, mapScale, viewportSize, model)}`}
                   />
                 ) : null}
-                {showStateMarkers ? (
+                {showStateMarkers && vehicle ? (
                   <rect
                     x={point.x - radius * 1.3}
                     y={point.y - radius * 1.3}
@@ -989,15 +998,17 @@ export function ReplayMap({
                     height={radius * 2.6}
                     rx={radius * 0.3}
                     fill="none"
-                    stroke="var(--chart-4)"
-                    strokeOpacity={state[3] === "dead" ? 0.35 : 0.85}
+                    stroke={teamMarkerColor(player.teamId)}
+                    strokeOpacity={state[3] === "dead" ? 0.35 : 0.95}
                     strokeWidth={markerRadius(
                       1.5,
                       mapScale,
                       viewportSize,
                       model
                     )}
-                  />
+                  >
+                    <title>载具移动：{vehicle.vehicleType}</title>
+                  </rect>
                 ) : null}
                 <circle
                   cx={point.x}
