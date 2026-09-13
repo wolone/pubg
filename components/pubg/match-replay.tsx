@@ -545,7 +545,7 @@ type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "state" | "zones"
 function replayTimelineKind(
   event: MatchAnalysis["timeline"][number]
 ): Exclude<ReplayTimelineLayer, "zones"> | null {
-  if (event.type.includes("Kill") || event.type.includes("Death")) {
+  if (isEliminationEvent(event)) {
     return "kills"
   }
   if (event.type.includes("Damage")) return "damage"
@@ -558,6 +558,10 @@ function replayTimelineKind(
     return "state"
   }
   return null
+}
+
+function isEliminationEvent(event: MatchAnalysis["timeline"][number]) {
+  return event.type.includes("Kill") || event.type.includes("Death")
 }
 
 function MapEventMarker({ children }: { children: React.ReactNode }) {
@@ -707,7 +711,7 @@ function ReplayMap({
   )
   const visibleKills = analysis.timeline.filter(
     (kill) =>
-      kill.type.includes("Kill") &&
+      isEliminationEvent(kill) &&
       (kill.elapsedSeconds === undefined || kill.elapsedSeconds <= visibleTime)
   )
   const visibleDamage = analysis.timeline.filter(
@@ -1736,8 +1740,8 @@ function ReplayTimeline({
             </Button>
             <Badge variant="outline">
               {filteredEvents.length === events.length
-                ? `${events.length} 个事件`
-                : `${filteredEvents.length} / ${events.length} 个事件`}
+                ? `可见事件 ${events.length}`
+                : `可见事件 ${filteredEvents.length} / ${events.length}`}
               {visibleKinds.includes("zones") && zoneMarkers.length
                 ? ` · ${zoneMarkers.length} 个圈层节点`
                 : ""}
@@ -1762,9 +1766,7 @@ function ReplayTimeline({
                     {formatTime(elapsedSeconds)}
                   </span>
                   <Badge
-                    variant={
-                      event.type.includes("Kill") ? "default" : "outline"
-                    }
+                    variant={isEliminationEvent(event) ? "default" : "outline"}
                   >
                     {formatTimelineEventType(event)}
                   </Badge>
@@ -1857,7 +1859,7 @@ function ReplayTimeline({
                   <dd>
                     <Badge
                       variant={
-                        selectedEvent.type.includes("Kill")
+                        isEliminationEvent(selectedEvent)
                           ? "default"
                           : "outline"
                       }
@@ -2073,7 +2075,7 @@ function ReplayEventMarkers({
             type="button"
             size="icon-xs"
             variant={
-              event.type.includes("Kill") || event.type.includes("Death")
+              isEliminationEvent(event)
                 ? "destructive"
                 : event.type.includes("Attack")
                   ? "secondary"
@@ -2644,7 +2646,7 @@ export function MatchReplay({
                     <dd>
                       <Badge
                         variant={
-                          selectedMapEvent.type.includes("Kill")
+                          isEliminationEvent(selectedMapEvent)
                             ? "default"
                             : "outline"
                         }
