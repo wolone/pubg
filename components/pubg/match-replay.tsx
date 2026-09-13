@@ -369,7 +369,8 @@ type ReplayMapBounds = {
 function extendRayToBounds(
   point: ReplayMapPoint,
   direction: { x: number; y: number },
-  bounds: ReplayMapBounds
+  bounds: ReplayMapBounds,
+  allowOpposite = true
 ) {
   const maxX = bounds.minX + bounds.width
   const maxY = bounds.minY + bounds.height
@@ -395,7 +396,17 @@ function extendRayToBounds(
   if (direction.y < 0) addCandidate((bounds.minY - point.y) / direction.y)
 
   const distance = Math.min(...candidates)
-  if (!Number.isFinite(distance)) return point
+  if (!Number.isFinite(distance)) {
+    if (allowOpposite) {
+      return extendRayToBounds(
+        point,
+        { x: -direction.x, y: -direction.y },
+        bounds,
+        false
+      )
+    }
+    return point
+  }
   return {
     x: point.x + direction.x * distance,
     y: point.y + direction.y * distance,
