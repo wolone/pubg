@@ -63,6 +63,9 @@ import type {
 } from "@/lib/pubg/types"
 
 const SPEEDS = [0.5, 1, 2, 4] as const
+const MAP_ZOOM_MIN = 1
+const MAP_ZOOM_MAX = 8
+const MAP_ZOOM_STEP = 0.25
 
 const MAP_SIZES: Record<string, number> = {
   Baltic_Main: 816000,
@@ -116,6 +119,12 @@ const statusColors: Record<ReplayPlayerStatus, string> = {
   alive: "var(--chart-2)",
   knocked: "var(--chart-3)",
   dead: "var(--muted-foreground)",
+}
+
+function teamMarkerColor(teamId: number | undefined) {
+  if (teamId === undefined) return "var(--muted-foreground)"
+  const hue = (((teamId * 137.508) % 360) + 360) % 360
+  return `hsl(${hue.toFixed(1)} 78% 52%)`
 }
 
 const eventTypeLabels: Record<string, string> = {
@@ -791,6 +800,12 @@ function ReplayMap({
     }
   }
 
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (event.deltaY === 0) return
+    onZoom(event.deltaY < 0 ? MAP_ZOOM_STEP : -MAP_ZOOM_STEP)
+  }
+
   return (
     <div className="relative aspect-square overflow-hidden rounded-xl border bg-muted/30">
       <div
@@ -804,6 +819,7 @@ function ReplayMap({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
       >
         {mapAssetUrl ? (
           <div
@@ -1122,8 +1138,17 @@ function ReplayMap({
                 return null
               }
               const radius = Math.max(bounds.width / (isTarget ? 90 : 180), 7)
+              const markerColor =
+                player.teamId === undefined
+                  ? statusColors[status]
+                  : teamMarkerColor(player.teamId)
+              const teamLabel =
+                player.teamId === undefined ? "?" : String(player.teamId)
               return (
                 <g key={player.id}>
+                  <title>
+                    {player.name} · 队 {teamLabel} · {statusLabels[status]}
+                  </title>
                   {isTarget ? (
                     <circle
                       cx={x}
@@ -1175,17 +1200,25 @@ function ReplayMap({
                     cx={x}
                     cy={y}
                     r={radius}
-                    fill={
-                      isTarget
-                        ? "var(--chart-1)"
-                        : isSelected
-                          ? "var(--chart-4)"
-                          : statusColors[status]
-                    }
+                    fill={markerColor}
                     fillOpacity={status === "dead" ? 0.45 : 0.95}
                     stroke="var(--background)"
                     strokeWidth={Math.max(bounds.width / 500000, 2)}
                   />
+                  <text
+                    x={x}
+                    y={y + Math.max(bounds.width / 360, 5)}
+                    fill="var(--background)"
+                    fontSize={Math.max(bounds.width / 260, 8)}
+                    fontWeight="700"
+                    textAnchor="middle"
+                    paintOrder="stroke"
+                    stroke="var(--foreground)"
+                    strokeOpacity="0.5"
+                    strokeWidth={Math.max(bounds.width / 500000, 2)}
+                  >
+                    {teamLabel}
+                  </text>
                   {isTarget || isSelected ? (
                     <text
                       x={x}
@@ -1250,6 +1283,9 @@ function ReplayMap({
             {currentFrame
               ? `T+${formatTime(currentFrame.elapsedSeconds)}`
               : "无位置数据"}
+          </Badge>
+          <Badge variant="outline" className="bg-background/85">
+            缩放 {mapScale.toFixed(2)}x
           </Badge>
         </div>
       </div>
@@ -1319,13 +1355,19 @@ function ReplayMap({
         <span className="rounded-md border bg-background/85 px-2 py-1">
           标记：击杀 / 伤害 / 开火 / 载具
         </span>
+        <span className="rounded-md border bg-background/85 px-2 py-1">
+          滚轮缩放 · 拖拽平移
+        </span>
+        <span className="rounded-md border bg-background/85 px-2 py-1">
+          人物数字=战队编号 · 颜色=战队
+        </span>
       </div>
       <div className="absolute right-3 bottom-12 flex flex-col gap-1">
         <Button
           size="icon-sm"
           variant="secondary"
           aria-label="放大地图"
-          onClick={() => onZoom(0.2)}
+          onClick={() => onZoom(MAP_ZOOM_STEP)}
         >
           <PlusIcon data-icon="inline-start" />
         </Button>
@@ -1333,7 +1375,7 @@ function ReplayMap({
           size="icon-sm"
           variant="secondary"
           aria-label="缩小地图"
-          onClick={() => onZoom(-0.2)}
+          onClick={() => onZoom(-MAP_ZOOM_STEP)}
         >
           <MinusIcon data-icon="inline-start" />
         </Button>
@@ -1514,10 +1556,12 @@ function Roster({
                   className="size-2 shrink-0 rounded-full"
                   style={{
                     backgroundColor: state
-                      ? isTarget
-                        ? "var(--chart-1)"
-                        : statusColors[state[3]]
-                      : "var(--muted-foreground)",
+                      ? player.teamId === undefined
+                        ? statusColors[state[3]]
+                        : teamMarkerColor(player.teamId)
+                      : player.teamId === undefined
+                        ? "var(--muted-foreground)"
+                        : teamMarkerColor(player.teamId),
                   }}
                 />
                 <span className="min-w-0 flex-1 truncate font-medium">
@@ -2427,11 +2471,16 @@ export function MatchReplay({
                 onPanChange={setMapPan}
                 onZoom={(delta) =>
                   setMapScale((value) =>
-                    delta === 0 ? 1 : Math.min(Math.max(value + delta, 1), 3)
+                    delta === 0
+                      ? MAP_ZOOM_MIN
+                      : Math.min(
+                          Math.max(value + delta, MAP_ZOOM_MIN),
+                          MAP_ZOOM_MAX
+                        )
                   )
                 }
                 onReset={() => {
-                  setMapScale(1)
+                  setMapScale(MAP_ZOOM_MIN)
                   setMapPan({ x: 0, y: 0 })
                 }}
                 onEventSelect={(event) => {
