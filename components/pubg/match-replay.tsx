@@ -690,6 +690,9 @@ function ReplayMap({
   }, [analysis.replayFrames, currentFrame, path, targetIndex, visibleTime])
   const trackedPathPointCount = trackedPath ? trackedPath.split(" ").length : 0
   const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(Boolean)
+  const firstZoneFrame = analysis.replayFrames.find((frame) =>
+    Object.values(frame.zones ?? {}).some(Boolean)
+  )
   const visibleKills = analysis.timeline.filter(
     (kill) =>
       kill.type.includes("Kill") &&
@@ -1213,7 +1216,11 @@ function ReplayMap({
             </Badge>
           ) : null}
           <Badge variant="outline" className="bg-background/85">
-            {hasCurrentZones ? "圈层已加载" : "圈层等待"}
+            {hasCurrentZones
+              ? "圈层已加载"
+              : firstZoneFrame
+                ? `首个圈层 T+${formatTime(firstZoneFrame.elapsedSeconds)}`
+                : "暂无圈层数据"}
           </Badge>
           <Badge variant="outline" className="bg-background/85">
             {currentFrame
