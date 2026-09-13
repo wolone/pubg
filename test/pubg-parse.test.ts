@@ -1316,6 +1316,14 @@ describe("PUBG JSON:API parser", () => {
     const analysis = parseTelemetry(
       [
         {
+          _T: "LogParachuteLanding",
+          elapsedTime: 0,
+          character: {
+            accountId: "account.123",
+            location: { x: 10, y: 20 },
+          },
+        },
+        {
           _T: "LogPlayerKill",
           elapsedTime: 1,
           killer: { accountId: "account.123" },
@@ -1347,6 +1355,9 @@ describe("PUBG JSON:API parser", () => {
     ).toBe(true)
     expect(
       analysis.timeline.some((event) => event.type === "LogPlayerTakeDamage")
+    ).toBe(true)
+    expect(
+      analysis.timeline.some((event) => event.type === "LogParachuteLanding")
     ).toBe(true)
   })
 

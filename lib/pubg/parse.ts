@@ -51,7 +51,7 @@ const REPLAY_ATTACK_EVENT_TYPES = new Set([
 ])
 
 const REPLAY_STATE_EVENT_PATTERN =
-  /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i
+  /^(?:LogPlayer(?:Login|Create|MakeGroggy|Knock|Revive|Rescue|Redeploy)|LogCarePackage(?:Spawn|Land)|LogVehicle(?:Ride|Leave)|LogParachuteLanding|LogVaultStart|LogSwim(?:Start|End|Stop))$/i
 
 function seasonDisplayName(id: string): string {
   const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
@@ -1249,6 +1249,7 @@ function timelineMessage(
   }
   if (type.includes("VehicleRide")) return `${actor ?? "玩家"} 进入载具`
   if (type.includes("VehicleLeave")) return `${actor ?? "玩家"} 离开载具`
+  if (type === "LogVehicleDamage") return `${actor ?? "载具"} 受到伤害`
   if (type === "LogPlayerLogin") return "玩家加入比赛"
   if (type === "LogPlayerCreate") return "玩家进入战场"
   if (type === "LogParachuteLanding") return `${actor ?? "玩家"} 着陆`
@@ -1276,6 +1277,9 @@ function compactTimeline(
   const carePackages = events.filter((event) =>
     event.type.includes("CarePackage")
   )
+  const movementEvents = events.filter((event) =>
+    /ParachuteLanding|Redeploy|Vault|Swim/i.test(event.type)
+  )
   const focusedCombat = events.filter(
     (event) =>
       (event.type.includes("Damage") || REPLAY_ATTACK_EVENT_TYPES.has(event.type)) &&
@@ -1293,9 +1297,10 @@ function compactTimeline(
     }
   }
 
-  add(focusedCombat, Math.min(48, max))
+  add(focusedCombat, Math.min(32, max))
   add(critical, Math.min(60, Math.max(0, max - selected.length)))
-  add(carePackages, Math.min(12, Math.max(0, max - selected.length)))
+  add(carePackages, Math.min(8, Math.max(0, max - selected.length)))
+  add(movementEvents, Math.min(20, Math.max(0, max - selected.length)))
   add(
     events.filter((event) => !selectedSet.has(event)),
     Math.max(0, max - selected.length)

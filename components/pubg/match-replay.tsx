@@ -109,6 +109,7 @@ const eventTypeLabels: Record<string, string> = {
   LogSwimEnd: "离开水面",
   LogSwimStart: "开始游泳",
   LogVaultStart: "翻越",
+  LogVehicleDamage: "载具受损",
   LogVehicleLeave: "离开载具",
   LogVehicleRide: "乘上载具",
 }
@@ -140,6 +141,9 @@ function formatTimelineEventType(event: MatchAnalysis["timeline"][number]) {
   }
   return formatEventType(event.type)
 }
+
+const replayMovementEventPattern =
+  /ParachuteLanding|Redeploy|Vault|Swim/i
 
 function formatTime(seconds: number) {
   const totalSeconds = Math.max(0, Math.floor(seconds))
@@ -346,9 +350,9 @@ function replayTimelineKind(
     return "attacks"
   }
   if (
-    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i.test(
+    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|VehicleRide|VehicleLeave/i.test(
       event.type
-    )
+    ) || replayMovementEventPattern.test(event.type)
   ) {
     return "state"
   }
@@ -817,8 +821,10 @@ function matchesTimelineFilter(
   if (filter === "combat") {
     return /Kill|Damage|Death|Attack|Throwable/.test(event.type)
   }
-  return /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|Vehicle|ParachuteLanding|Redeploy|Vault|Swim/i.test(
-    event.type
+  return (
+    /Login|Create|Groggy|Knock|Revive|Rescue|CarePackage|VehicleRide|VehicleLeave/i.test(
+      event.type
+    ) || replayMovementEventPattern.test(event.type)
   )
 }
 
