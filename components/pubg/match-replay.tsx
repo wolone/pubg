@@ -617,8 +617,7 @@ function ReplayMap({
                 cx={currentFrame.zones.redzone.x}
                 cy={currentFrame.zones.redzone.y}
                 r={currentFrame.zones.redzone.radius}
-                fill="#ef4444"
-                fillOpacity="0.14"
+                fill="none"
                 stroke="#ef4444"
                 strokeOpacity="0.9"
                 strokeWidth={2.5}
@@ -634,8 +633,7 @@ function ReplayMap({
                 cx={currentFrame.zones.blackzone.x}
                 cy={currentFrame.zones.blackzone.y}
                 r={currentFrame.zones.blackzone.radius}
-                fill="#a855f7"
-                fillOpacity="0.1"
+                fill="none"
                 stroke="#a855f7"
                 strokeOpacity="0.85"
                 strokeWidth={2.5}
