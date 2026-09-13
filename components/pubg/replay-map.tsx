@@ -525,15 +525,27 @@ export function ReplayMap({
   const trackedPath = React.useMemo(() => {
     if (targetIndex < 0) return ""
     const points: string[] = []
-    for (const frame of analysis.replayFrames) {
-      if (frame.elapsedSeconds > visibleTime) break
-      const player = frame.players.find(
-        ([playerIndex]) => playerIndex === targetIndex
-      )
-      if (!player) continue
-      const point = model.projectPoint({ x: player[1], y: player[2] })
-      const value = `${point.x},${point.y}`
-      if (points.at(-1) !== value) points.push(value)
+    const timedTrajectory = analysis.trajectory
+      .filter((point) => point.elapsedSeconds !== undefined)
+      .sort((left, right) => left.elapsedSeconds! - right.elapsedSeconds!)
+    if (timedTrajectory.length) {
+      for (const trajectoryPoint of timedTrajectory) {
+        if (trajectoryPoint.elapsedSeconds! > visibleTime) break
+        const point = model.projectPoint(trajectoryPoint)
+        const value = `${point.x},${point.y}`
+        if (points.at(-1) !== value) points.push(value)
+      }
+    } else {
+      for (const frame of analysis.replayFrames) {
+        if (frame.elapsedSeconds > visibleTime) break
+        const player = frame.players.find(
+          ([playerIndex]) => playerIndex === targetIndex
+        )
+        if (!player) continue
+        const point = model.projectPoint({ x: player[1], y: player[2] })
+        const value = `${point.x},${point.y}`
+        if (points.at(-1) !== value) points.push(value)
+      }
     }
     const currentPlayer = currentFrame?.players.find(
       ([playerIndex]) => playerIndex === targetIndex
@@ -547,7 +559,14 @@ export function ReplayMap({
       if (points.at(-1) !== value) points.push(value)
     }
     return points.join(" ")
-  }, [analysis.replayFrames, currentFrame, model, targetIndex, visibleTime])
+  }, [
+    analysis.replayFrames,
+    analysis.trajectory,
+    currentFrame,
+    model,
+    targetIndex,
+    visibleTime,
+  ])
 
   const currentZones =
     currentFrame && isReplayZoneActive(currentFrame)

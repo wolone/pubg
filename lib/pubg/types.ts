@@ -77,6 +77,10 @@ export interface TelemetryLocation {
   z?: number
 }
 
+export interface ReplayTrajectoryPoint extends TelemetryLocation {
+  elapsedSeconds?: number
+}
+
 export interface TelemetryEvent {
   type: string
   timestamp: string | null
@@ -156,7 +160,7 @@ export interface MatchAnalysis {
   playerId: string
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
-  trajectory: Array<{ x: number; y: number; z?: number }>
+  trajectory: ReplayTrajectoryPoint[]
   flightPath: Array<{ x: number; y: number; z?: number }>
   carePackages: ReplayCarePackageEvent[]
   replayPlayers: ReplayPlayer[]

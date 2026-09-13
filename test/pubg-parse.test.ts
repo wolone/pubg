@@ -844,8 +844,8 @@ describe("PUBG JSON:API parser", () => {
 
     expect(analysis.flightPath).toEqual([{ x: 140, y: 240, z: 1000 }])
     expect(analysis.trajectory).toEqual([
-      { x: 100, y: 200, z: 7000 },
-      { x: 120, y: 220, z: 5000 },
+      { x: 100, y: 200, z: 7000, elapsedSeconds: 0 },
+      { x: 120, y: 220, z: 5000, elapsedSeconds: 10 },
     ])
   })
 
@@ -882,8 +882,8 @@ describe("PUBG JSON:API parser", () => {
     )
 
     expect(analysis.trajectory).toEqual([
-      { x: 100, y: 200, z: 90000 },
-      { x: 200, y: 300, z: 2000 },
+      { x: 100, y: 200, z: 90000, elapsedSeconds: 10 },
+      { x: 200, y: 300, z: 2000, elapsedSeconds: 20 },
     ])
     expect(
       analysis.replayFrames.flatMap((frame) => frame.players)
@@ -967,7 +967,9 @@ describe("PUBG JSON:API parser", () => {
       { x: 100, y: 200, z: 150000 },
       { x: 200, y: 300, z: 150000 },
     ])
-    expect(analysis.trajectory).toEqual([{ x: 300, y: 400, z: 1200 }])
+    expect(analysis.trajectory).toEqual([
+      { x: 300, y: 400, z: 1200, elapsedSeconds: 20 },
+    ])
     expect(analysis.replayFrames.at(-1)?.players[0]).toEqual([
       0,
       300,
@@ -1113,7 +1115,9 @@ describe("PUBG JSON:API parser", () => {
       location: { x: 200, y: 300 },
       message: "TestPlayer 开火",
     })
-    expect(analysis.trajectory).toEqual([{ x: 200, y: 300 }])
+    expect(analysis.trajectory).toEqual([
+      { x: 200, y: 300, elapsedSeconds: 18 },
+    ])
   })
 
   it("tracks vehicle state without retaining raw vehicle telemetry", () => {

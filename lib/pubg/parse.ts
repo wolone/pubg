@@ -9,6 +9,7 @@ import type {
   ReplayCarePackageEvent,
   ReplayPlayer,
   ReplayPlayerStatus,
+  ReplayTrajectoryPoint,
   ReplayZones,
   SeasonStats,
   SeasonSummary,
@@ -263,7 +264,7 @@ export function parseTelemetry(
   playerId: string
   kills: TelemetryEvent[]
   timeline: TelemetryEvent[]
-  trajectory: Array<{ x: number; y: number; z?: number }>
+  trajectory: ReplayTrajectoryPoint[]
   flightPath: Array<{ x: number; y: number; z?: number }>
   carePackages: ReplayCarePackageEvent[]
   replayPlayers: ReplayPlayer[]
@@ -272,7 +273,7 @@ export function parseTelemetry(
 } {
   const events = Array.isArray(raw) ? raw : []
   const timeline: TelemetryEvent[] = []
-  const trajectory: Array<{ x: number; y: number; z?: number }> = []
+  const trajectory: ReplayTrajectoryPoint[] = []
   const carePackages: ReplayCarePackageEvent[] = []
   const flightPathBuckets = new Map<
     number,
@@ -595,7 +596,7 @@ export function parseTelemetry(
       (type === "LogPlayerPosition" || type === "LogPlayerAttack") &&
       (type !== "LogPlayerAttack" || !isPlayerAirborne)
     ) {
-      trajectory.push(location)
+      trajectory.push({ ...location, elapsedSeconds })
     }
 
     const isRelevant =
