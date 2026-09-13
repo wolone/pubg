@@ -420,6 +420,11 @@ export function parseTelemetry(
           ? { alivePlayers: eventAlivePlayers }
           : {}),
         phase,
+        ...(replaySnapshot
+          ? { framePriority: "supporting" as const }
+          : type === "LogPhaseChange"
+            ? { framePriority: "critical" as const }
+            : {}),
       })
     }
 
@@ -463,6 +468,7 @@ export function parseTelemetry(
         elapsedSeconds,
         playerId: actor,
         killsDelta: 1,
+        framePriority: "critical",
       })
     }
     if (
@@ -507,6 +513,7 @@ export function parseTelemetry(
           status: "dead",
           location: victimLocation,
           health: 0,
+          framePriority: "critical",
         })
         if (victimLocation) {
           positionCounts.set(target, (positionCounts.get(target) ?? 0) + 1)
@@ -520,6 +527,7 @@ export function parseTelemetry(
           playerId: deadPlayerId,
           status: "dead",
           health: 0,
+          framePriority: "critical",
         })
       }
     } else if (/groggy|knock/i.test(type)) {
@@ -529,6 +537,7 @@ export function parseTelemetry(
           elapsedSeconds,
           playerId: knockedPlayerId,
           status: "knocked",
+          framePriority: "critical",
         })
       }
     } else if (/revive|rescue/i.test(type)) {
@@ -538,6 +547,7 @@ export function parseTelemetry(
           elapsedSeconds,
           playerId: revivedPlayerId,
           status: "alive",
+          framePriority: "critical",
         })
       }
     }
@@ -625,6 +635,7 @@ export function parseTelemetry(
 
 type ReplayChange = {
   elapsedSeconds: number
+  framePriority?: "critical" | "supporting"
   playerId?: string
   location?: { x: number; y: number; z?: number } | null
   status?: ReplayPlayerStatus
@@ -820,8 +831,11 @@ function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
     gameState.poisonGasWarningRadius,
     Number.NaN
   )
-  const safezone = replayZoneOf(gameState.safetyZonePosition, safetyRadius)
-  const bluezone = replayZoneOf(
+  // PUBG telemetry names the current outer blue zone as safetyZone and the
+  // next playable white zone as poisonGasWarning. Keep the normalized names
+  // aligned with the official client and map legend.
+  const bluezone = replayZoneOf(gameState.safetyZonePosition, safetyRadius)
+  const safezone = replayZoneOf(
     gameState.poisonGasWarningPosition,
     normalizeWarningRadius(safetyRadius, warningRadius)
   )
@@ -864,21 +878,49 @@ function sampleFrameTimes(values: number[], count: number) {
   })
 }
 
-function limitFrameTimes(
-  values: number[],
-  importantTimes: Set<number>,
+function selectFrameTimes(
+  regularTimes: number[],
+  criticalTimes: number[],
+  supportingTimes: number[],
   count: number
 ) {
-  if (values.length <= count) return values
-  const important = values.filter((value) => importantTimes.has(value))
-  if (important.length >= count) return sampleFrameTimes(important, count)
-  const regular = values.filter((value) => !importantTimes.has(value))
-  return Array.from(
-    new Set([
-      ...important,
-      ...sampleFrameTimes(regular, count - important.length),
-    ])
+  const allTimes = Array.from(
+    new Set([...regularTimes, ...criticalTimes, ...supportingTimes])
   ).sort((left, right) => left - right)
+  if (allTimes.length <= count) return allTimes
+
+  const selected = new Set<number>()
+  const firstTime = allTimes[0]
+  const lastTime = allTimes.at(-1)
+  if (firstTime !== undefined) selected.add(firstTime)
+  if (lastTime !== undefined) selected.add(lastTime)
+
+  const add = (times: number[], budget: number) => {
+    if (budget <= 0) return
+    for (const time of sampleFrameTimes(times, budget)) {
+      selected.add(time)
+    }
+  }
+
+  const availableAfterBounds = Math.max(0, count - selected.size)
+  if (criticalTimes.length > availableAfterBounds) {
+    add(criticalTimes, availableAfterBounds)
+  } else {
+    add(criticalTimes, criticalTimes.length)
+    const remainingAfterCritical = Math.max(0, count - selected.size)
+    add(supportingTimes, remainingAfterCritical)
+    const remainingAfterSupporting = Math.max(0, count - selected.size)
+    add(regularTimes, remainingAfterSupporting)
+  }
+
+  if (selected.size < count) {
+    add(
+      allTimes.filter((time) => !selected.has(time)),
+      count - selected.size
+    )
+  }
+
+  return Array.from(selected).sort((left, right) => left - right)
 }
 
 function buildReplay(changes: ReplayChange[], playerIds: string[]) {
@@ -898,17 +940,20 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     )
   )
   const stepSeconds = Math.max(1, Math.ceil(durationSeconds / maxFrameCount))
-  const exactFrameTimes = new Set<number>(
-    sortedChanges
-      .filter(
-        (change) =>
-          change.status !== undefined ||
-          change.healthDelta !== undefined ||
-          change.killsDelta !== undefined ||
-          change.damageDelta !== undefined
-      )
-      .map((change) => change.elapsedSeconds)
-  )
+  const criticalFrameTimes = Array.from(
+    new Set(
+      sortedChanges
+        .filter((change) => change.framePriority === "critical")
+        .map((change) => change.elapsedSeconds)
+    )
+  ).sort((left, right) => left - right)
+  const supportingFrameTimes = Array.from(
+    new Set(
+      sortedChanges
+        .filter((change) => change.framePriority === "supporting")
+        .map((change) => change.elapsedSeconds)
+    )
+  ).sort((left, right) => left - right)
   const regularFrameTimes = new Set<number>()
   for (
     let elapsedSeconds = 0;
@@ -918,13 +963,16 @@ function buildReplay(changes: ReplayChange[], playerIds: string[]) {
     regularFrameTimes.add(elapsedSeconds)
   }
   regularFrameTimes.add(durationSeconds)
-  const frameTimes = limitFrameTimes(
-    Array.from(new Set([...regularFrameTimes, ...exactFrameTimes])).sort(
-      (left, right) => left - right
-    ),
-    exactFrameTimes,
+  const frameTimes = selectFrameTimes(
+    Array.from(regularFrameTimes),
+    criticalFrameTimes,
+    supportingFrameTimes,
     maxFrameCount
   )
+  const exactFrameTimes = new Set([
+    ...criticalFrameTimes,
+    ...supportingFrameTimes,
+  ])
   const playerIndexById = new Map(playerIds.map((id, index) => [id, index]))
   const states = new Map<string, ReplayState>()
   const frames: ReplayFrame[] = []
