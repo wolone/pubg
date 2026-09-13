@@ -112,6 +112,10 @@ function isEliminationEvent(event: MatchAnalysis["timeline"][number]) {
   return event.type.includes("Kill") || event.type.includes("Death")
 }
 
+export function isGunDamageEvent(event: MatchAnalysis["timeline"][number]) {
+  return event.type === "LogPlayerTakeDamage" && event.damageType === "Damage_Gun"
+}
+
 function isReplayZoneActive(frame: ReplayFrame) {
   return frame.phase === undefined || frame.phase >= 1
 }
@@ -610,7 +614,7 @@ export function ReplayMap({
   const activeTracers = analysis.timeline.filter(
     (event) =>
       visibleTimelineLayers.includes("damage") &&
-      event.type.includes("Damage") &&
+      isGunDamageEvent(event) &&
       event.location &&
       event.targetLocation &&
       event.elapsedSeconds !== undefined &&

@@ -1,9 +1,37 @@
 import { describe, expect, it } from "vitest"
 
 import { interpolateFrame } from "@/components/pubg/match-replay"
-import { activeCarePackagesAtTime } from "@/components/pubg/replay-map"
+import {
+  activeCarePackagesAtTime,
+  isGunDamageEvent,
+} from "@/components/pubg/replay-map"
 
 describe("replay frame synchronization", () => {
+  it("only treats official gun damage as a replay tracer", () => {
+    expect(
+      isGunDamageEvent({
+        type: "LogPlayerTakeDamage",
+        damageType: "Damage_Gun",
+        timestamp: null,
+        actor: "account.attacker",
+        target: "account.victim",
+        location: { x: 10, y: 20 },
+        message: "枪械伤害",
+      })
+    ).toBe(true)
+    expect(
+      isGunDamageEvent({
+        type: "LogPlayerTakeDamage",
+        damageType: "Damage_BlueZone",
+        timestamp: null,
+        actor: null,
+        target: "account.victim",
+        location: { x: 10, y: 20 },
+        message: "蓝区伤害",
+      })
+    ).toBe(false)
+  })
+
   it("keeps active care packages and pairs landings with the nearest drop", () => {
     const events = [
       {
