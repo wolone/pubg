@@ -324,6 +324,7 @@ function currentStates(frame: ReplayFrame | null) {
 }
 
 type MapPan = { x: number; y: number }
+type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
 
 function ReplayMap({
   mapName,
@@ -334,6 +335,8 @@ function ReplayMap({
   selectedPlayerId,
   mapScale,
   mapPan,
+  visibleLayers,
+  onVisibleLayersChange,
   onPanChange,
   onZoom,
   onReset,
@@ -346,10 +349,16 @@ function ReplayMap({
   selectedPlayerId: string
   mapScale: number
   mapPan: MapPan
+  visibleLayers: ReplayLayer[]
+  onVisibleLayersChange: (layers: ReplayLayer[]) => void
   onPanChange: (pan: MapPan) => void
   onZoom: (delta: number) => void
   onReset: () => void
 }) {
+  const showFlightPath = visibleLayers.includes("flightPath")
+  const showTrajectory = visibleLayers.includes("trajectory")
+  const showZones = visibleLayers.includes("zones")
+  const showEvents = visibleLayers.includes("events")
   const bounds = React.useMemo(
     () => getBounds(analysis, mapName),
     [analysis, mapName]
@@ -415,9 +424,7 @@ function ReplayMap({
   const selectedPathPointCount = selectedPath
     ? selectedPath.split(" ").length
     : 0
-  const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(
-    Boolean
-  )
+  const hasCurrentZones = Object.values(currentFrame?.zones ?? {}).some(Boolean)
   const visibleKills = analysis.timeline.filter(
     (kill) =>
       kill.type.includes("Kill") &&
@@ -549,7 +556,7 @@ function ReplayMap({
             strokeOpacity="0.2"
             strokeWidth={Math.max(bounds.width / 816000, 1)}
           />
-          {analysis.flightPath.length > 0 ? (
+          {showFlightPath && analysis.flightPath.length > 0 ? (
             <g>
               <title>起始航线</title>
               {analysis.flightPath.length > 1 ? (
@@ -585,7 +592,7 @@ function ReplayMap({
               ) : null}
             </g>
           ) : null}
-          {currentFrame?.zones?.redzone ? (
+          {showZones && currentFrame?.zones?.redzone ? (
             <g>
               <title>红区</title>
               <circle
@@ -601,7 +608,7 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {currentFrame?.zones?.blackzone ? (
+          {showZones && currentFrame?.zones?.blackzone ? (
             <g>
               <title>特殊区</title>
               <circle
@@ -617,7 +624,7 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {currentFrame?.zones?.bluezone ? (
+          {showZones && currentFrame?.zones?.bluezone ? (
             <g>
               <title>蓝圈</title>
               <circle
@@ -632,7 +639,7 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {currentFrame?.zones?.safezone ? (
+          {showZones && currentFrame?.zones?.safezone ? (
             <g>
               <title>白圈</title>
               <circle
@@ -647,14 +654,12 @@ function ReplayMap({
               />
             </g>
           ) : null}
-          {selectedPath ? (
+          {showTrajectory && selectedPath ? (
             <polyline
               points={selectedPath}
               fill="none"
               stroke={
-                selectedPlayerId === analysis.playerId
-                  ? "#22d3ee"
-                  : "#f59e0b"
+                selectedPlayerId === analysis.playerId ? "#22d3ee" : "#f59e0b"
               }
               strokeOpacity="0.45"
               strokeWidth={Math.max(bounds.width / 240000, 2)}
@@ -663,107 +668,117 @@ function ReplayMap({
               strokeDasharray={`${Math.max(bounds.width / 120000, 4)} ${Math.max(bounds.width / 180000, 6)}`}
             />
           ) : null}
-          {visibleKills.map((kill, index) =>
-            kill.location ? (
-              <g key={`${kill.timestamp}-${index}`}>
-                <title>{kill.message}</title>
-                <circle
-                  cx={kill.location.x}
-                  cy={kill.location.y}
-                  r={Math.max(bounds.width / 100, 8)}
-                  fill={
-                    kill.actor === analysis.playerId
-                      ? "var(--destructive)"
-                      : "var(--chart-5)"
-                  }
-                  fillOpacity="0.15"
-                  stroke={
-                    kill.actor === analysis.playerId
-                      ? "var(--destructive)"
-                      : "var(--chart-5)"
-                  }
-                  strokeWidth={Math.max(bounds.width / 400000, 2)}
-                />
-                <circle
-                  cx={kill.location.x}
-                  cy={kill.location.y}
-                  r={Math.max(bounds.width / 260, 4)}
-                  fill={
-                    kill.actor === analysis.playerId
-                      ? "var(--destructive)"
-                      : "var(--chart-5)"
-                  }
-                />
-              </g>
-            ) : null
-          )}
-          {visibleDamage.map((event, index) =>
-            event.location ? (
-              <circle
-                key={`${event.timestamp}-${index}`}
-                cx={event.location.x}
-                cy={event.location.y}
-                r={Math.max(bounds.width / 350, 4)}
-                fill="var(--chart-3)"
-                fillOpacity="0.7"
-                stroke="var(--background)"
-                strokeWidth={Math.max(bounds.width / 500000, 2)}
-              />
-            ) : null
-          )}
-          {visibleAttacks.map((event, index) =>
-            event.location ? (
-              <g key={`attack-${event.timestamp}-${index}`}>
-                <title>{event.message}</title>
-                <path
-                  d={`M ${event.location.x - Math.max(bounds.width / 260, 5)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 260, 5)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 260, 5)} V ${event.location.y + Math.max(bounds.width / 260, 5)}`}
-                  stroke="var(--chart-1)"
-                  strokeOpacity="0.8"
-                  strokeWidth={Math.max(bounds.width / 500000, 2)}
-                  strokeLinecap="round"
-                />
-              </g>
-            ) : null
-          )}
-          {activeDamage.map((event, index) =>
-            event.location && event.targetLocation ? (
-              <line
-                key={`tracer-${event.timestamp}-${index}`}
-                x1={event.location.x}
-                y1={event.location.y}
-                x2={event.targetLocation.x}
-                y2={event.targetLocation.y}
-                stroke="var(--chart-3)"
-                strokeOpacity="0.8"
-                strokeWidth={Math.max(bounds.width / 180000, 3)}
-                strokeDasharray={`${Math.max(bounds.width / 70000, 8)} ${Math.max(bounds.width / 90000, 10)}`}
-                strokeLinecap="round"
-              />
-            ) : null
-          )}
-          {visibleCarePackages.map((event, index) =>
-            event.location ? (
-              <g key={`care-package-${event.timestamp}-${index}`}>
-                <rect
-                  x={event.location.x - Math.max(bounds.width / 170, 8)}
-                  y={event.location.y - Math.max(bounds.width / 170, 8)}
-                  width={Math.max(bounds.width / 85, 16)}
-                  height={Math.max(bounds.width / 85, 16)}
-                  rx={Math.max(bounds.width / 300, 4)}
-                  fill="var(--chart-4)"
-                  fillOpacity="0.9"
-                  stroke="var(--background)"
-                  strokeWidth={Math.max(bounds.width / 500000, 2)}
-                />
-                <path
-                  d={`M ${event.location.x - Math.max(bounds.width / 230, 6)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 230, 6)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 230, 6)} V ${event.location.y + Math.max(bounds.width / 230, 6)}`}
-                  stroke="var(--background)"
-                  strokeWidth={Math.max(bounds.width / 500000, 2)}
-                  strokeLinecap="round"
-                />
-              </g>
-            ) : null
-          )}
+          {showEvents
+            ? visibleKills.map((kill, index) =>
+                kill.location ? (
+                  <g key={`${kill.timestamp}-${index}`}>
+                    <title>{kill.message}</title>
+                    <circle
+                      cx={kill.location.x}
+                      cy={kill.location.y}
+                      r={Math.max(bounds.width / 100, 8)}
+                      fill={
+                        kill.actor === analysis.playerId
+                          ? "var(--destructive)"
+                          : "var(--chart-5)"
+                      }
+                      fillOpacity="0.15"
+                      stroke={
+                        kill.actor === analysis.playerId
+                          ? "var(--destructive)"
+                          : "var(--chart-5)"
+                      }
+                      strokeWidth={Math.max(bounds.width / 400000, 2)}
+                    />
+                    <circle
+                      cx={kill.location.x}
+                      cy={kill.location.y}
+                      r={Math.max(bounds.width / 260, 4)}
+                      fill={
+                        kill.actor === analysis.playerId
+                          ? "var(--destructive)"
+                          : "var(--chart-5)"
+                      }
+                    />
+                  </g>
+                ) : null
+              )
+            : null}
+          {showEvents
+            ? visibleDamage.map((event, index) =>
+                event.location ? (
+                  <circle
+                    key={`${event.timestamp}-${index}`}
+                    cx={event.location.x}
+                    cy={event.location.y}
+                    r={Math.max(bounds.width / 350, 4)}
+                    fill="var(--chart-3)"
+                    fillOpacity="0.7"
+                    stroke="var(--background)"
+                    strokeWidth={Math.max(bounds.width / 500000, 2)}
+                  />
+                ) : null
+              )
+            : null}
+          {showEvents
+            ? visibleAttacks.map((event, index) =>
+                event.location ? (
+                  <g key={`attack-${event.timestamp}-${index}`}>
+                    <title>{event.message}</title>
+                    <path
+                      d={`M ${event.location.x - Math.max(bounds.width / 260, 5)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 260, 5)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 260, 5)} V ${event.location.y + Math.max(bounds.width / 260, 5)}`}
+                      stroke="var(--chart-1)"
+                      strokeOpacity="0.8"
+                      strokeWidth={Math.max(bounds.width / 500000, 2)}
+                      strokeLinecap="round"
+                    />
+                  </g>
+                ) : null
+              )
+            : null}
+          {showEvents
+            ? activeDamage.map((event, index) =>
+                event.location && event.targetLocation ? (
+                  <line
+                    key={`tracer-${event.timestamp}-${index}`}
+                    x1={event.location.x}
+                    y1={event.location.y}
+                    x2={event.targetLocation.x}
+                    y2={event.targetLocation.y}
+                    stroke="var(--chart-3)"
+                    strokeOpacity="0.8"
+                    strokeWidth={Math.max(bounds.width / 180000, 3)}
+                    strokeDasharray={`${Math.max(bounds.width / 70000, 8)} ${Math.max(bounds.width / 90000, 10)}`}
+                    strokeLinecap="round"
+                  />
+                ) : null
+              )
+            : null}
+          {showEvents
+            ? visibleCarePackages.map((event, index) =>
+                event.location ? (
+                  <g key={`care-package-${event.timestamp}-${index}`}>
+                    <rect
+                      x={event.location.x - Math.max(bounds.width / 170, 8)}
+                      y={event.location.y - Math.max(bounds.width / 170, 8)}
+                      width={Math.max(bounds.width / 85, 16)}
+                      height={Math.max(bounds.width / 85, 16)}
+                      rx={Math.max(bounds.width / 300, 4)}
+                      fill="var(--chart-4)"
+                      fillOpacity="0.9"
+                      stroke="var(--background)"
+                      strokeWidth={Math.max(bounds.width / 500000, 2)}
+                    />
+                    <path
+                      d={`M ${event.location.x - Math.max(bounds.width / 230, 6)} ${event.location.y} H ${event.location.x + Math.max(bounds.width / 230, 6)} M ${event.location.x} ${event.location.y - Math.max(bounds.width / 230, 6)} V ${event.location.y + Math.max(bounds.width / 230, 6)}`}
+                      stroke="var(--background)"
+                      strokeWidth={Math.max(bounds.width / 500000, 2)}
+                      strokeLinecap="round"
+                    />
+                  </g>
+                ) : null
+              )
+            : null}
           {Array.from(states.entries()).map(
             ([playerIndex, [, x, y, status]]) => {
               const player = analysis.replayPlayers[playerIndex]
@@ -886,6 +901,32 @@ function ReplayMap({
               : "无位置数据"}
           </Badge>
         </div>
+      </div>
+      <div className="pointer-events-none absolute inset-x-3 top-12 flex items-center gap-2">
+        <ToggleGroup
+          multiple
+          value={visibleLayers}
+          onValueChange={(value) =>
+            onVisibleLayersChange(value as ReplayLayer[])
+          }
+          variant="outline"
+          size="sm"
+          aria-label="切换回放地图图层"
+          className="pointer-events-auto bg-background/85"
+        >
+          <ToggleGroupItem value="flightPath" aria-label="切换起始航线">
+            航线
+          </ToggleGroupItem>
+          <ToggleGroupItem value="trajectory" aria-label="切换运动轨迹">
+            轨迹
+          </ToggleGroupItem>
+          <ToggleGroupItem value="zones" aria-label="切换圈层">
+            圈层
+          </ToggleGroupItem>
+          <ToggleGroupItem value="events" aria-label="切换事件标记">
+            事件
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
       <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
         {analysis.flightPath.length > 0 ? (
@@ -1183,9 +1224,7 @@ function matchesTimelineFilter(
 ) {
   if (filter === "all") return true
   if (filter === "selected") {
-    return (
-      event.actor === selectedPlayerId || event.target === selectedPlayerId
-    )
+    return event.actor === selectedPlayerId || event.target === selectedPlayerId
   }
   if (filter === "combat") {
     return /Kill|Damage|Death|Attack/.test(event.type)
@@ -1575,6 +1614,12 @@ export function MatchReplay({
   const [speed, setSpeed] = React.useState<number>(1)
   const [mapScale, setMapScale] = React.useState(1)
   const [mapPan, setMapPan] = React.useState<MapPan>({ x: 0, y: 0 })
+  const [visibleLayers, setVisibleLayers] = React.useState<ReplayLayer[]>([
+    "flightPath",
+    "trajectory",
+    "zones",
+    "events",
+  ])
   const [selectedPlayerId, setSelectedPlayerId] = React.useState(
     analysis.playerId
   )
@@ -1686,6 +1731,8 @@ export function MatchReplay({
                 selectedPlayerId={selectedPlayerId}
                 mapScale={mapScale}
                 mapPan={mapPan}
+                visibleLayers={visibleLayers}
+                onVisibleLayersChange={setVisibleLayers}
                 onPanChange={setMapPan}
                 onZoom={(delta) =>
                   setMapScale((value) =>
