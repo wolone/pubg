@@ -90,8 +90,19 @@ const MAP_LABELS: Record<string, string> = {
   Neon_Main: "Rondo",
 }
 
-const MAP_ASSET_BASE =
-  "https://raw.githubusercontent.com/pubgsh/client/master/src/assets"
+const MAP_ASSET_PATHS: Record<string, string> = {
+  Baltic_Main: "/maps/Baltic_Main.png",
+  Erangel_Main: "/maps/Erangel_Main.png",
+  Desert_Main: "/maps/Desert_Main.png",
+  Savage_Main: "/maps/Savage_Main.png",
+  DihorOtok_Main: "/maps/DihorOtok_Main.png",
+  Summerland_Main: "/maps/Summerland_Main.png",
+  Chimera_Main: "/maps/Chimera_Main.png",
+  Heaven_Main: "/maps/Heaven_Main.png",
+  Tiger_Main: "/maps/Tiger_Main.png",
+  Kiki_Main: "/maps/Kiki_Main.png",
+  Neon_Main: "/maps/Neon_Main.jpg",
+}
 
 const statusLabels: Record<ReplayPlayerStatus, string> = {
   alive: "存活",
@@ -453,9 +464,7 @@ function ReplayMap({
       (event.elapsedSeconds === undefined ||
         event.elapsedSeconds <= visibleTime)
   )
-  const mapAssetUrl = MAP_SIZES[mapName]
-    ? `${MAP_ASSET_BASE}/${mapName}.jpg`
-    : null
+  const mapAssetUrl = MAP_ASSET_PATHS[mapName] ?? null
   const panRef = React.useRef<{
     startX: number
     startY: number
@@ -1586,16 +1595,39 @@ function ReplayEventMarkers({
   duration: number
   onSeek: (seconds: number) => void
 }) {
-  const markers = events.filter(
-    (event) =>
-      event.elapsedSeconds !== undefined && /Kill|Death|Attack/.test(event.type)
-  )
+  const markerLaneOffsets = [-12, 0, 12]
+  const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
+  const markers = events
+    .flatMap((event) => {
+      if (
+        event.elapsedSeconds === undefined ||
+        !/Kill|Death|Attack/.test(event.type)
+      ) {
+        return []
+      }
+      return [{ event, seconds: event.elapsedSeconds }]
+    })
+    .sort((left, right) => left.seconds - right.seconds)
+    .map((marker) => {
+      const lane =
+        laneEndTimes.findIndex((lastTime) => marker.seconds - lastTime >= 8) ??
+        -1
+      const resolvedLane =
+        lane >= 0
+          ? lane
+          : laneEndTimes.reduce(
+              (leastBusyLane, lastTime, index) =>
+                lastTime < laneEndTimes[leastBusyLane]! ? index : leastBusyLane,
+              0
+            )
+      laneEndTimes[resolvedLane] = marker.seconds
+      return { ...marker, lane: resolvedLane }
+    })
   if (duration <= 0 || markers.length === 0) return null
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-1/2 h-6 -translate-y-1/2">
-      {markers.map((event, index) => {
-        const seconds = event.elapsedSeconds ?? 0
+      {markers.map(({ event, seconds, lane }, index) => {
         const position = Math.min(100, Math.max(0, (seconds / duration) * 100))
         return (
           <Button
@@ -1606,7 +1638,10 @@ function ReplayEventMarkers({
               event.type.includes("Attack") ? "secondary" : "destructive"
             }
             className="pointer-events-auto absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{ left: `${position}%` }}
+            style={{
+              left: `${position}%`,
+              top: `calc(50% + ${markerLaneOffsets[lane]}px)`,
+            }}
             aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
             onClick={() => onSeek(seconds)}
           >
@@ -1922,7 +1957,7 @@ export function MatchReplay({
                         </Select>
                       </div>
                     </div>
-                    <div className="relative">
+                    <div className="relative py-4">
                       <Slider
                         value={[currentTime]}
                         min={0}
