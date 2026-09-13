@@ -2206,7 +2206,9 @@ export function MatchReplay({
   const hasStaticTrajectory = analysis.trajectory.length > 0
   const hasTimelineData =
     analysis.timeline.length > 0 ||
-    analysis.replayFrames.some((frame) => Boolean(frame.zones))
+    analysis.replayFrames.some(
+      (frame) => isReplayZoneActive(frame) && Boolean(frame.zones)
+    )
   const timelineLayerCounts = React.useMemo(() => {
     const counts: Record<ReplayTimelineLayer, number> = {
       kills: 0,
