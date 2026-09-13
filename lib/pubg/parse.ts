@@ -229,6 +229,29 @@ function telemetryCharacter(event: Record<string, unknown>, key: string) {
     : undefined
 }
 
+function carePackageItems(itemPackage: Record<string, unknown> | undefined) {
+  if (!itemPackage || !Array.isArray(itemPackage.items)) return undefined
+  const items = itemPackage.items
+    .map((item): { itemId: string; stackCount?: number } | null => {
+      if (!item || typeof item !== "object") return null
+      const record = item as Record<string, unknown>
+      const itemId = stringValue(record.itemId, "")
+      if (!itemId) return null
+      const stackCount = optionalNonNegativeNumber(record.stackCount)
+      return {
+        itemId,
+        ...(stackCount !== undefined && stackCount > 1
+          ? { stackCount: Math.floor(stackCount) }
+          : {}),
+      }
+    })
+    .filter((item): item is { itemId: string; stackCount?: number } =>
+      Boolean(item)
+    )
+    .slice(0, 12)
+  return items.length ? items : undefined
+}
+
 export function parseTelemetry(
   raw: unknown,
   playerId: string,
@@ -326,6 +349,9 @@ export function parseTelemetry(
     const eventAlivePlayers = optionalNonNegativeNumber(event.numAlivePlayers)
     const damageType = stringValue(event.damageTypeCategory, "") || undefined
     const replaySnapshot = parseReplaySnapshot(event)
+    const items = type.includes("CarePackage")
+      ? carePackageItems(itemPackage)
+      : undefined
     const phase = replayPhaseOf(event)
     const vehicleType = vehicleTypeOf(vehicle)
     const isFlightPosition =
@@ -548,6 +574,7 @@ export function parseTelemetry(
       target,
       location,
       ...(victimLocation ? { targetLocation: victimLocation } : {}),
+      ...(items ? { items } : {}),
       ...(damage !== undefined ? { damage } : {}),
       ...(damageType ? { damageType } : {}),
       message: timelineMessage(

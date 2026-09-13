@@ -85,9 +85,15 @@ export interface TelemetryEvent {
   target: string | null
   location: TelemetryLocation | null
   targetLocation?: TelemetryLocation
+  items?: TelemetryItem[]
   damage?: number
   damageType?: string
   message: string
+}
+
+export interface TelemetryItem {
+  itemId: string
+  stackCount?: number
 }
 
 export type ReplayPlayerStatus = "alive" | "knocked" | "dead"

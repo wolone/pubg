@@ -63,6 +63,7 @@ import type {
   ReplayPlayerStatus,
   ReplayZone,
   ReplayZones,
+  TelemetryItem,
 } from "@/lib/pubg/types"
 
 const SPEEDS = [0.5, 1, 2, 4] as const
@@ -157,6 +158,22 @@ function formatEventLocation(
   const coordinates = [location.x, location.y]
   if (location.z !== undefined) coordinates.push(location.z)
   return coordinates.map((value) => Math.round(value)).join(", ")
+}
+
+function formatItemId(itemId: string) {
+  return itemId
+    .replace(/^Item_/, "")
+    .replace(/_C$/, "")
+    .replaceAll("_", " ")
+}
+
+function formatItems(items: TelemetryItem[]) {
+  return items
+    .map(
+      (item) =>
+        `${formatItemId(item.itemId)}${item.stackCount && item.stackCount > 1 ? ` ×${item.stackCount}` : ""}`
+    )
+    .join(" · ")
 }
 
 function formatDamage(damage: number) {
@@ -1092,6 +1109,14 @@ function ReplayTimeline({
                     </dd>
                   </div>
                 ) : null}
+                {selectedEvent.items?.length ? (
+                  <div className="flex flex-col gap-1 sm:col-span-2">
+                    <dt className="text-xs text-muted-foreground">补给箱内容</dt>
+                    <dd className="text-sm">
+                      {formatItems(selectedEvent.items)}
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="flex flex-col gap-1">
                   <dt className="text-xs text-muted-foreground">发起玩家</dt>
                   <dd className="truncate text-sm">
@@ -1905,6 +1930,16 @@ export function MatchReplay({
                       <dt className="text-xs text-muted-foreground">伤害</dt>
                       <dd className="text-sm">
                         {formatDamage(selectedMapEvent.damage)} 点
+                      </dd>
+                    </div>
+                  ) : null}
+                  {selectedMapEvent.items?.length ? (
+                    <div className="flex flex-col gap-1 sm:col-span-2">
+                      <dt className="text-xs text-muted-foreground">
+                        补给箱内容
+                      </dt>
+                      <dd className="text-sm">
+                        {formatItems(selectedMapEvent.items)}
                       </dd>
                     </div>
                   ) : null}

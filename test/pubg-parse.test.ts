@@ -523,6 +523,10 @@ describe("PUBG JSON:API parser", () => {
           itemPackage: {
             itemPackageId: "package-1",
             location: { x: 300, y: 400, z: 20 },
+            items: [
+              { itemId: "Item_Weapon_M24_C", stackCount: 1 },
+              { itemId: "Item_Ammo_762mm_C", stackCount: 15 },
+            ],
           },
         },
         {
@@ -543,6 +547,10 @@ describe("PUBG JSON:API parser", () => {
       "LogCarePackageLand",
     ])
     expect(analysis.timeline[0]?.location).toMatchObject({ x: 300, y: 400 })
+    expect(analysis.timeline[0]?.items).toEqual([
+      { itemId: "Item_Weapon_M24_C" },
+      { itemId: "Item_Ammo_762mm_C", stackCount: 15 },
+    ])
     expect(analysis.timeline[1]?.message).toBe("补给箱已落地")
   })
 
