@@ -628,6 +628,7 @@ function ReplayMap({
   const showTrajectory = visibleLayers.includes("trajectory")
   const showZones = visibleLayers.includes("zones")
   const showEvents = visibleLayers.includes("events")
+  const showStateMarkers = visibleTimelineLayers.includes("state")
   const bounds = React.useMemo(
     () => getBounds(analysis, mapName),
     [analysis, mapName]
@@ -1129,7 +1130,7 @@ function ReplayMap({
                       strokeDasharray={`${Math.max(bounds.width / 90000, 8)} ${Math.max(bounds.width / 70000, 8)}`}
                     />
                   ) : null}
-                  {vehicleIndexes.has(playerIndex) ? (
+                  {showStateMarkers && vehicleIndexes.has(playerIndex) ? (
                     <rect
                       x={x - radius * 1.25}
                       y={y - radius * 1.25}
