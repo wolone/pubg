@@ -435,7 +435,7 @@ function currentStates(frame: ReplayFrame | null) {
 
 type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
-type ReplayTimelineLayer = "kills" | "attacks" | "zones"
+type ReplayTimelineLayer = "kills" | "damage" | "attacks" | "zones"
 
 function MapEventMarker({ children }: { children: React.ReactNode }) {
   return <g>{children}</g>
@@ -1760,9 +1760,11 @@ function ReplayEventMarkers({
       const kind =
         event.type.includes("Kill") || event.type.includes("Death")
           ? "kills"
-          : event.type.includes("Attack")
-            ? "attacks"
-            : undefined
+          : event.type.includes("Damage")
+            ? "damage"
+            : event.type.includes("Attack")
+              ? "attacks"
+              : undefined
       if (
         event.elapsedSeconds === undefined ||
         kind === undefined ||
@@ -2153,6 +2155,7 @@ export function MatchReplay({
                         <ToggleGroupItem value="kills">
                           击杀/淘汰
                         </ToggleGroupItem>
+                        <ToggleGroupItem value="damage">伤害</ToggleGroupItem>
                         <ToggleGroupItem value="attacks">开火</ToggleGroupItem>
                         <ToggleGroupItem value="zones">
                           圈层阶段
@@ -2173,7 +2176,10 @@ export function MatchReplay({
                         }
                       />
                       {visibleTimelineLayers.some(
-                        (layer) => layer === "kills" || layer === "attacks"
+                        (layer) =>
+                          layer === "kills" ||
+                          layer === "damage" ||
+                          layer === "attacks"
                       ) ? (
                         <ReplayEventMarkers
                           events={analysis.timeline}
