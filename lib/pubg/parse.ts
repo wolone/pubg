@@ -873,8 +873,6 @@ function buildFlightPath(
 }
 
 function replayPhaseOf(event: Record<string, unknown>) {
-  const directPhase = optionalNonNegativeNumber(event.phase)
-  if (directPhase !== undefined) return directPhase
   const common = event.common
   if (common && typeof common === "object") {
     const commonPhase = optionalNonNegativeNumber(
@@ -883,9 +881,14 @@ function replayPhaseOf(event: Record<string, unknown>) {
     if (commonPhase !== undefined) return commonPhase
   }
   const value = event.gameState
-  if (!value || typeof value !== "object") return undefined
-  const gameState = value as Record<string, unknown>
-  return optionalNonNegativeNumber(gameState.isGame ?? gameState.phase)
+  if (value && typeof value === "object") {
+    const gameState = value as Record<string, unknown>
+    const gameStatePhase = optionalNonNegativeNumber(
+      gameState.isGame ?? gameState.phase
+    )
+    if (gameStatePhase !== undefined) return gameStatePhase
+  }
+  return optionalNonNegativeNumber(event.phase)
 }
 
 function optionalPercentageNumber(value: unknown) {

@@ -523,6 +523,48 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.replayFrames.at(-1)?.phase).toBe(6)
   })
 
+  it("uses common.isGame over an early LogPhaseChange phase", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogGameStatePeriodic",
+          elapsedTime: 80,
+          common: { isGame: 0.1 },
+          gameState: {
+            safetyZonePosition: { x: 408000, y: 408000 },
+            safetyZoneRadius: 582000,
+          },
+        },
+        {
+          _T: "LogPhaseChange",
+          elapsedTime: 90,
+          phase: 1,
+          common: { isGame: 0.1 },
+        },
+        {
+          _T: "LogGameStatePeriodic",
+          elapsedTime: 100,
+          common: { isGame: 1 },
+          gameState: {
+            safetyZonePosition: { x: 408000, y: 408000 },
+            safetyZoneRadius: 582000,
+            poisonGasWarningPosition: { x: 500000, y: 480000 },
+            poisonGasWarningRadius: 192000,
+          },
+        },
+      ],
+      "account.123",
+      "match-phase-source"
+    )
+
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 90)?.phase
+    ).toBe(0.1)
+    expect(
+      analysis.replayFrames.find((frame) => frame.elapsedSeconds === 100)?.phase
+    ).toBe(1)
+  })
+
   it("normalizes a final safe-zone radius with a telemetry unit shift", () => {
     const analysis = parseTelemetry(
       [
