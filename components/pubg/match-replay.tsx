@@ -441,10 +441,6 @@ function getRosterTeamKey(teamId: number | undefined) {
   return teamId === undefined ? "unknown" : String(teamId)
 }
 
-function isBotReplayParticipant(id: string) {
-  return /^(?:ai|npc)\./i.test(id)
-}
-
 function rosterTeamLabel(teamId: number | undefined) {
   return teamId === undefined ? "未分组" : "队 " + teamId
 }
@@ -508,9 +504,16 @@ function Roster({
   const participantsById = new Map(
     match.participants.map((participant) => [participant.id, participant])
   )
+  const replayPlayerIds = new Set(
+    analysis.replayPlayers.map((player) => player.id)
+  )
+  const hasReplayRoster = replayPlayerIds.size > 0
   const visiblePlayers: RosterPlayer[] = [
     ...match.participants
-      .filter((participant) => !isBotReplayParticipant(participant.id))
+      .filter(
+        (participant) =>
+          !hasReplayRoster || replayPlayerIds.has(participant.id)
+      )
       .map((participant) => ({
         participant,
         player: {
