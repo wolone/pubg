@@ -1492,11 +1492,13 @@ function ReplayTimeline({
 
 function ReplayHud({
   analysis,
+  officialTargetKills,
   participantCount,
   currentFrame,
   currentTime,
 }: {
   analysis: MatchAnalysis
+  officialTargetKills: number
   participantCount: number
   currentFrame: ReplayFrame | null
   currentTime: number
@@ -1560,9 +1562,9 @@ function ReplayHud({
         icon={ActivityIcon}
       />
       <StatCard
-        label="目标玩家击杀"
+        label="目标玩家击杀（回放）"
         value={String(currentKills)}
-        detail={`${analysis.kills.length} 次总计`}
+        detail={`${analysis.kills.length} 次遥测事件 · 官方战绩 ${officialTargetKills} 次`}
         icon={CrosshairIcon}
       />
     </div>
@@ -1875,6 +1877,7 @@ export function MatchReplay({
               <>
                 <ReplayHud
                   analysis={analysis}
+                  officialTargetKills={match.targetPlayerKills}
                   participantCount={match.participantCount}
                   currentFrame={currentFrame}
                   currentTime={currentTime}

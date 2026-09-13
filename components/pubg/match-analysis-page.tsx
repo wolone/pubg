@@ -176,12 +176,19 @@ export function MatchAnalysisPage({
                 </CardHeader>
                 <CardContent className="text-2xl font-semibold">
                   {analysis ? (
-                    <>
-                      {analysis.kills.length}{" "}
-                      <span className="text-sm font-normal text-muted-foreground">
-                        / {analysis.timeline.length}
+                    <div className="flex flex-col items-start">
+                      <span>
+                        {match.targetPlayerKills}{" "}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          / {analysis.timeline.length}
+                        </span>
                       </span>
-                    </>
+                      {analysis.kills.length !== match.targetPlayerKills ? (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          遥测识别 {analysis.kills.length} 次
+                        </span>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="text-base font-normal text-muted-foreground">
                       暂无遥测
