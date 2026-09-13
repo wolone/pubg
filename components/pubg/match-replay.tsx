@@ -366,6 +366,57 @@ type ReplayMapBounds = {
   height: number
 }
 
+function extendRayToBounds(
+  point: ReplayMapPoint,
+  direction: { x: number; y: number },
+  bounds: ReplayMapBounds,
+  allowOpposite = true
+) {
+  const maxX = bounds.minX + bounds.width
+  const maxY = bounds.minY + bounds.height
+  const candidates: number[] = []
+  const addCandidate = (distance: number) => {
+    if (!Number.isFinite(distance) || distance < 0) return
+    const x = point.x + direction.x * distance
+    const y = point.y + direction.y * distance
+    const epsilon = Math.max(bounds.width, bounds.height) * 1e-8
+    if (
+      x >= bounds.minX - epsilon &&
+      x <= maxX + epsilon &&
+      y >= bounds.minY - epsilon &&
+      y <= maxY + epsilon
+    ) {
+      candidates.push(distance)
+    }
+  }
+
+  if (direction.x !== 0) {
+    addCandidate((maxX - point.x) / direction.x)
+    addCandidate((bounds.minX - point.x) / direction.x)
+  }
+  if (direction.y !== 0) {
+    addCandidate((maxY - point.y) / direction.y)
+    addCandidate((bounds.minY - point.y) / direction.y)
+  }
+
+  const distance = Math.min(...candidates)
+  if (!Number.isFinite(distance)) {
+    if (allowOpposite) {
+      return extendRayToBounds(
+        point,
+        { x: -direction.x, y: -direction.y },
+        bounds,
+        false
+      )
+    }
+    return point
+  }
+  return {
+    x: point.x + direction.x * distance,
+    y: point.y + direction.y * distance,
+  }
+}
+
 function clipFlightSegmentToBounds(
   start: ReplayMapPoint,
   end: ReplayMapPoint,
@@ -418,14 +469,37 @@ function clipFlightPathToBounds(
   bounds: ReplayMapBounds
 ) {
   if (points.length < 2) return points
+  const first = points[0]!
+  const second = points[1]!
+  const last = points.at(-1)!
+  const previous = points.at(-2)!
+  const extendedPoints = [
+    {
+      ...first,
+      ...extendRayToBounds(
+        first,
+        { x: first.x - second.x, y: first.y - second.y },
+        bounds
+      ),
+    },
+    ...points.slice(1, -1),
+    {
+      ...last,
+      ...extendRayToBounds(
+        last,
+        { x: last.x - previous.x, y: last.y - previous.y },
+        bounds
+      ),
+    },
+  ]
   const clipped: ReplayMapPoint[] = []
   const samePoint = (left: ReplayMapPoint, right: ReplayMapPoint) =>
     Math.abs(left.x - right.x) < 0.001 && Math.abs(left.y - right.y) < 0.001
 
-  for (let index = 1; index < points.length; index += 1) {
+  for (let index = 1; index < extendedPoints.length; index += 1) {
     const segment = clipFlightSegmentToBounds(
-      points[index - 1]!,
-      points[index]!,
+      extendedPoints[index - 1]!,
+      extendedPoints[index]!,
       bounds
     )
     if (!segment) continue
