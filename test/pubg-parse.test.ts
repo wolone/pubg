@@ -713,6 +713,33 @@ describe("PUBG JSON:API parser", () => {
     ])
   })
 
+  it("keeps official character locations from non-inventory events", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogParachuteLanding",
+          elapsedTime: 8,
+          character: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 500, y: 600, z: 1200 },
+          },
+        },
+      ],
+      "account.123",
+      "match-character-location"
+    )
+
+    expect(analysis.replayFrames.at(-1)?.players[0]).toEqual([
+      0,
+      500,
+      600,
+      "alive",
+      100,
+    ])
+    expect(analysis.trajectory).toEqual([])
+  })
+
   it("does not describe zero damage as effective damage", () => {
     const analysis = parseTelemetry(
       [
