@@ -1682,6 +1682,10 @@ function ReplayTimeline({
         : result,
     -1
   )
+  const activeEventRef = React.useRef<HTMLButtonElement | null>(null)
+  React.useEffect(() => {
+    activeEventRef.current?.scrollIntoView({ block: "nearest" })
+  }, [activeIndex])
   const navigationNodes = getReplayNavigationNodes(
     filteredEvents,
     zoneMarkers,
@@ -1755,8 +1759,10 @@ function ReplayTimeline({
               return (
                 <Button
                   key={`${event.type}-${event.timestamp}-${index}`}
+                  ref={index === activeIndex ? activeEventRef : undefined}
                   variant={index === activeIndex ? "secondary" : "ghost"}
                   className="h-auto min-h-12 justify-start gap-3 px-2 py-2 text-left"
+                  aria-current={index === activeIndex ? "time" : undefined}
                   onClick={() => {
                     onSeek(elapsedSeconds)
                     setSelectedEvent(event)
