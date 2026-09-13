@@ -109,8 +109,8 @@ describe("PUBG JSON:API parser", () => {
       "alive",
     ])
     expect(analysis.replayFrames.find((frame) => frame.zones)?.zones).toEqual({
-      bluezone: { x: 400, y: 500, radius: 300 },
-      safezone: { x: 410, y: 510, radius: 120 },
+      bluezone: { x: 410, y: 510, radius: 120 },
+      safezone: { x: 400, y: 500, radius: 300 },
       redzone: { x: 600, y: 700, radius: 80 },
       blackzone: null,
     })
@@ -438,8 +438,8 @@ describe("PUBG JSON:API parser", () => {
     )
 
     expect(analysis.replayFrames[0]?.zones).toEqual({
-      bluezone: { x: 400000, y: 400000, radius: 6788.203125 },
-      safezone: { x: 400000, y: 400000, radius: 6788.203239440918 },
+      bluezone: { x: 400000, y: 400000, radius: 6788.203239440918 },
+      safezone: { x: 400000, y: 400000, radius: 6788.203125 },
       redzone: null,
       blackzone: null,
     })

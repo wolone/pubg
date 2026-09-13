@@ -725,8 +725,8 @@ function parseReplayZones(event: Record<string, unknown>): ReplayZones | null {
     gameState.poisonGasWarningRadius,
     Number.NaN
   )
-  const bluezone = replayZoneOf(gameState.safetyZonePosition, safetyRadius)
-  const safezone = replayZoneOf(
+  const safezone = replayZoneOf(gameState.safetyZonePosition, safetyRadius)
+  const bluezone = replayZoneOf(
     gameState.poisonGasWarningPosition,
     normalizeWarningRadius(safetyRadius, warningRadius)
   )
