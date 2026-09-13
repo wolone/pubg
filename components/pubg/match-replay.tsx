@@ -598,6 +598,7 @@ function ReplayMap({
   currentTime,
   duration,
   selectedPlayerId,
+  visibleTimelineLayers,
   mapScale,
   mapPan,
   visibleLayers,
@@ -613,6 +614,7 @@ function ReplayMap({
   currentTime: number
   duration: number
   selectedPlayerId: string
+  visibleTimelineLayers: ReplayTimelineLayer[]
   mapScale: number
   mapPan: MapPan
   visibleLayers: ReplayLayer[]
@@ -707,6 +709,7 @@ function ReplayMap({
   )
   const activeDamage = analysis.timeline.filter(
     (event) =>
+      visibleTimelineLayers.includes("damage") &&
       event.type.includes("Damage") &&
       event.location &&
       event.targetLocation &&
@@ -721,10 +724,10 @@ function ReplayMap({
         event.elapsedSeconds <= visibleTime)
   )
   const mapEvents = [
-    ...visibleKills,
-    ...visibleDamage,
-    ...visibleAttacks,
-    ...visibleCarePackages,
+    ...(visibleTimelineLayers.includes("kills") ? visibleKills : []),
+    ...(visibleTimelineLayers.includes("damage") ? visibleDamage : []),
+    ...(visibleTimelineLayers.includes("attacks") ? visibleAttacks : []),
+    ...(visibleTimelineLayers.includes("state") ? visibleCarePackages : []),
   ]
   const mapAssetUrl = MAP_ASSET_PATHS[mapName] ?? null
   const panRef = React.useRef<{
@@ -965,7 +968,7 @@ function ReplayMap({
               vectorEffect="non-scaling-stroke"
             />
           ) : null}
-          {showEvents
+          {showEvents && visibleTimelineLayers.includes("kills")
             ? visibleKills.map((kill, index) =>
                 kill.location ? (
                   <MapEventMarker key={`${kill.timestamp}-${index}`}>
@@ -1001,7 +1004,7 @@ function ReplayMap({
                 ) : null
               )
             : null}
-          {showEvents
+          {showEvents && visibleTimelineLayers.includes("damage")
             ? visibleDamage.map((event, index) =>
                 event.location ? (
                   <MapEventMarker key={`${event.timestamp}-${index}`}>
@@ -1018,7 +1021,7 @@ function ReplayMap({
                 ) : null
               )
             : null}
-          {showEvents
+          {showEvents && visibleTimelineLayers.includes("attacks")
             ? visibleAttacks.map((event, index) =>
                 event.location ? (
                   <MapEventMarker key={`attack-${event.timestamp}-${index}`}>
@@ -1052,7 +1055,7 @@ function ReplayMap({
                 ) : null
               )
             : null}
-          {showEvents
+          {showEvents && visibleTimelineLayers.includes("state")
             ? visibleCarePackages.map((event, index) =>
                 event.location ? (
                   <MapEventMarker
@@ -1627,7 +1630,7 @@ function ReplayTimeline({
           <div>
             <h3 className="text-sm font-semibold">事件时间线</h3>
             <p className="text-xs text-muted-foreground">
-              点击事件跳转到回放位置；上方事件开关同步控制显示
+              点击事件跳转到回放位置；上方事件开关同步控制地图标记和列表
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -2214,6 +2217,7 @@ export function MatchReplay({
                 currentTime={currentTime}
                 duration={duration}
                 selectedPlayerId={selectedPlayerId}
+                visibleTimelineLayers={visibleTimelineLayers}
                 mapScale={mapScale}
                 mapPan={mapPan}
                 visibleLayers={visibleLayers}
