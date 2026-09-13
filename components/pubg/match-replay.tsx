@@ -451,6 +451,7 @@ function MapEventMarker({
       role="button"
       tabIndex={0}
       className="pointer-events-auto cursor-pointer"
+      pointerEvents="all"
       aria-label={`打开事件 ${formatTime(event.elapsedSeconds ?? 0)}：${event.message}`}
       onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
       onClick={(pointerEvent) => {
@@ -658,7 +659,7 @@ function ReplayMap({
         ) : null}
         <svg
           viewBox={`${bounds.minX} ${bounds.minY} ${bounds.width} ${bounds.height}`}
-          className="pointer-events-none absolute inset-0 size-full"
+          className="pointer-events-auto absolute inset-0 size-full"
           role="img"
           aria-label="比赛回放地图"
         >
