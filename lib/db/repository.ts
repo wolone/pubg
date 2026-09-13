@@ -11,7 +11,7 @@ import type {
 
 const CACHE_TTL_MS = 15 * 60 * 1000
 const MATCH_TTL_MS = 14 * 24 * 60 * 60 * 1000
-const REPLAY_PARSER_VERSION = 37
+const REPLAY_PARSER_VERSION = 38
 
 type StatsRow = {
   platform: Platform

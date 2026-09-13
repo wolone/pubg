@@ -754,6 +754,37 @@ describe("PUBG JSON:API parser", () => {
     expect(analysis.timeline[0]?.message).toBe("TestPlayer 受到 12.3 点伤害")
   })
 
+  it("does not turn non-player damage targets into replay participants", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerTakeDamage",
+          elapsedTime: 10,
+          damage: 25,
+          damageTypeCategory: "Damage_Gun",
+          attacker: {
+            accountId: "account.123",
+            name: "TestPlayer",
+            location: { x: 100, y: 200 },
+          },
+          victim: {
+            type: "npc",
+            accountId: "npc.bear",
+            name: "Bear",
+            location: { x: 120, y: 220 },
+          },
+        },
+      ],
+      "account.123",
+      "match-non-player-damage"
+    )
+
+    expect(analysis.timeline).toEqual([])
+    expect(analysis.replayPlayers).toEqual([
+      { id: "account.123", name: "TestPlayer" },
+    ])
+  })
+
   it("keeps downed-state damage neutral when telemetry repeats the victim", () => {
     const analysis = parseTelemetry(
       [

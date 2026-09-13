@@ -239,6 +239,11 @@ function telemetryCharacter(event: Record<string, unknown>, key: string) {
     : undefined
 }
 
+function isUserTelemetryCharacter(character: Record<string, unknown>) {
+  const type = stringValue(character.type, "")
+  return !type || /user/i.test(type)
+}
+
 function carePackageItems(itemPackage: Record<string, unknown> | undefined) {
   if (!itemPackage || !Array.isArray(itemPackage.items)) return undefined
   const items = itemPackage.items
@@ -381,10 +386,16 @@ export function parseTelemetry(
       stringValue(attacker?.accountId, "") ||
       participantIdsByName.get(attackerName) ||
       characterId
+    const isNonPlayerDamage =
+      type === "LogPlayerTakeDamage" &&
+      victim !== undefined &&
+      !isUserTelemetryCharacter(victim)
     const target =
-      stringValue(victim?.accountId, "") ||
-      participantIdsByName.get(victimName) ||
-      null
+      isNonPlayerDamage
+        ? null
+        : stringValue(victim?.accountId, "") ||
+          participantIdsByName.get(victimName) ||
+          null
     const victimLocation = locationOf(victim?.location)
     const health = optionalPercentageNumber(
       character?.health ?? attacker?.health
@@ -657,7 +668,7 @@ export function parseTelemetry(
 
     const isRelevant =
       type.includes("Kill") ||
-      type.includes("Damage") ||
+      (!isNonPlayerDamage && type.includes("Damage")) ||
       REPLAY_ATTACK_EVENT_TYPES.has(type) ||
       type.includes("Death") ||
       REPLAY_STATE_EVENT_PATTERN.test(type) ||
