@@ -38,7 +38,9 @@ const stringValue = (value: unknown, fallback = "") =>
   typeof value === "string" && value.length > 0 ? value : fallback
 
 const MAX_REPLAY_PLAYERS = 100
-const MAX_REPLAY_PLAYER_FRAMES = 64 * 600
+// Keep the normalized replay snapshot safely below D1's per-value limit while
+// retaining enough frames for smooth interpolation between official events.
+const MAX_REPLAY_PLAYER_FRAMES = 48 * 600
 
 function seasonDisplayName(id: string): string {
   const numberedSeason = id.match(/pc-2018-(\d+)$/)?.[1]
