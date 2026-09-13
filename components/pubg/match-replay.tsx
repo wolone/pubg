@@ -2068,7 +2068,7 @@ function ReplayEventMarkers({
     const previous = kindMarkers.at(-1)
     if (
       previous &&
-      event.elapsedSeconds - previous.seconds < groupingGapSeconds
+      event.elapsedSeconds - previous.endSeconds < groupingGapSeconds
     ) {
       previous.count += 1
       previous.endSeconds = event.elapsedSeconds
@@ -2100,7 +2100,7 @@ function ReplayEventMarkers({
                 lastTime < laneEndTimes[leastBusyLane]! ? index : leastBusyLane,
               0
             )
-      laneEndTimes[resolvedLane] = marker.seconds
+      laneEndTimes[resolvedLane] = marker.endSeconds
       return { ...marker, lane: resolvedLane }
     })
   if (duration <= 0 || markers.length === 0) return null
