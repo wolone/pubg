@@ -888,6 +888,36 @@ describe("PUBG JSON:API parser", () => {
     expect(
       analysis.replayFrames.flatMap((frame) => frame.players)
     ).toContainEqual([0, 100, 200, "alive", 100])
+    expect(analysis.replayFrames).toContainEqual({
+      elapsedSeconds: 10,
+      players: [[0, 100, 200, "alive", 100]],
+    })
+  })
+
+  it("preserves airborne points during trajectory downsampling", () => {
+    const analysis = parseTelemetry(
+      Array.from({ length: 300 }, (_, index) => ({
+        _T: "LogPlayerPosition",
+        elapsedTime: index,
+        character: {
+          accountId: "account.123",
+          location: {
+            x: index,
+            y: index,
+            z: index === 150 ? 90000 : 2000,
+          },
+        },
+      })),
+      "account.123",
+      "match-airborne-downsample"
+    )
+
+    expect(analysis.trajectory).toContainEqual({
+      x: 150,
+      y: 150,
+      z: 90000,
+      elapsedSeconds: 150,
+    })
   })
 
   it("orders trajectory points by elapsed telemetry time", () => {

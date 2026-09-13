@@ -474,6 +474,14 @@ export function parseTelemetry(
           location,
           health,
           vehicleType: vehicleState,
+          ...(isPlayerAirborne
+            ? {
+                framePriority:
+                  replayPlayerId === playerId
+                    ? ("critical" as const)
+                    : ("supporting" as const),
+              }
+            : {}),
         })
         positionCounts.set(
           replayPlayerId,
@@ -662,14 +670,7 @@ export function parseTelemetry(
       120,
       playerId
     ),
-    trajectory: downsample(
-      [...trajectory].sort(
-        (left, right) =>
-          (left.elapsedSeconds ?? Number.POSITIVE_INFINITY) -
-          (right.elapsedSeconds ?? Number.POSITIVE_INFINITY)
-      ),
-      240
-    ),
+    trajectory: downsampleTrajectory(trajectory, 240),
     flightPath: downsample(buildFlightPath(flightPathBuckets), 96),
     carePackages,
     replayPlayers,
@@ -1261,5 +1262,32 @@ function downsample<T>(items: T[], max: number): T[] {
   return Array.from(
     { length: max },
     (_, index) => items[Math.round(index * step)]
+  )
+}
+
+function downsampleTrajectory(
+  points: ReplayTrajectoryPoint[],
+  max: number
+): ReplayTrajectoryPoint[] {
+  if (max <= 0) return []
+  const ordered = [...points].sort(
+    (left, right) =>
+      (left.elapsedSeconds ?? Number.POSITIVE_INFINITY) -
+      (right.elapsedSeconds ?? Number.POSITIVE_INFINITY)
+  )
+  if (ordered.length <= max) return ordered
+
+  const critical = ordered.filter(
+    (point, index) =>
+      index === 0 || index === ordered.length - 1 || isAirborneLocation(point)
+  )
+  if (critical.length >= max) return downsample(critical, max)
+
+  const criticalSet = new Set(critical)
+  const regular = ordered.filter((point) => !criticalSet.has(point))
+  return [...critical, ...downsample(regular, max - critical.length)].sort(
+    (left, right) =>
+      (left.elapsedSeconds ?? Number.POSITIVE_INFINITY) -
+      (right.elapsedSeconds ?? Number.POSITIVE_INFINITY)
   )
 }
