@@ -2207,6 +2207,20 @@ export function MatchReplay({
   const hasTimelineData =
     analysis.timeline.length > 0 ||
     analysis.replayFrames.some((frame) => Boolean(frame.zones))
+  const timelineLayerCounts = React.useMemo(() => {
+    const counts: Record<ReplayTimelineLayer, number> = {
+      kills: 0,
+      damage: 0,
+      attacks: 0,
+      state: 0,
+      zones: getReplayZoneMarkers(analysis.replayFrames).length,
+    }
+    for (const event of analysis.timeline) {
+      const kind = replayTimelineKind(event)
+      if (kind) counts[kind] += 1
+    }
+    return counts
+  }, [analysis.replayFrames, analysis.timeline])
   const [currentTime, setCurrentTime] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
   const [speed, setSpeed] = React.useState<number>(1)
@@ -2451,15 +2465,19 @@ export function MatchReplay({
                         aria-label="切换时间轴标记"
                       >
                         <ToggleGroupItem value="kills">
-                          击杀/淘汰
+                          击杀/淘汰 ({timelineLayerCounts.kills})
                         </ToggleGroupItem>
-                        <ToggleGroupItem value="damage">伤害</ToggleGroupItem>
-                        <ToggleGroupItem value="attacks">开火</ToggleGroupItem>
+                        <ToggleGroupItem value="damage">
+                          伤害 ({timelineLayerCounts.damage})
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="attacks">
+                          开火 ({timelineLayerCounts.attacks})
+                        </ToggleGroupItem>
                         <ToggleGroupItem value="state">
-                          状态/载具
+                          状态/载具 ({timelineLayerCounts.state})
                         </ToggleGroupItem>
                         <ToggleGroupItem value="zones">
-                          圈层阶段
+                          圈层阶段 ({timelineLayerCounts.zones})
                         </ToggleGroupItem>
                       </ToggleGroup>
                     </div>
