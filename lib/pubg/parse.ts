@@ -662,7 +662,14 @@ export function parseTelemetry(
       120,
       playerId
     ),
-    trajectory: downsample(trajectory, 240),
+    trajectory: downsample(
+      [...trajectory].sort(
+        (left, right) =>
+          (left.elapsedSeconds ?? Number.POSITIVE_INFINITY) -
+          (right.elapsedSeconds ?? Number.POSITIVE_INFINITY)
+      ),
+      240
+    ),
     flightPath: downsample(buildFlightPath(flightPathBuckets), 96),
     carePackages,
     replayPlayers,

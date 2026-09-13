@@ -890,6 +890,45 @@ describe("PUBG JSON:API parser", () => {
     ).toContainEqual([0, 100, 200, "alive", 100])
   })
 
+  it("orders trajectory points by elapsed telemetry time", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 30,
+          character: {
+            accountId: "account.123",
+            location: { x: 300, y: 300 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 100 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          character: {
+            accountId: "account.123",
+            location: { x: 200, y: 200 },
+          },
+        },
+      ],
+      "account.123",
+      "match-trajectory-order"
+    )
+
+    expect(analysis.trajectory).toEqual([
+      { x: 100, y: 100, elapsedSeconds: 10 },
+      { x: 200, y: 200, elapsedSeconds: 20 },
+      { x: 300, y: 300, elapsedSeconds: 30 },
+    ])
+  })
+
   it("stops the flight path when aircraft telemetry jumps after the drop", () => {
     const analysis = parseTelemetry(
       [
