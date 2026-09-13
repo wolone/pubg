@@ -462,7 +462,11 @@ export function parseTelemetry(
 
     const replayPlayerId = characterId ?? actor
     if (replayPlayerId) {
-      if (location && !isFlightPosition && !isPlayerAirborne) {
+      const isReplayLocation =
+        location &&
+        !isFlightPosition &&
+        (type === "LogPlayerPosition" || !isPlayerAirborne)
+      if (isReplayLocation) {
         replayChanges.push({
           elapsedSeconds,
           playerId: replayPlayerId,
@@ -588,8 +592,8 @@ export function parseTelemetry(
       actor === playerId &&
       location &&
       !isFlightPosition &&
-      !isPlayerAirborne &&
-      (type === "LogPlayerPosition" || type === "LogPlayerAttack")
+      (type === "LogPlayerPosition" || type === "LogPlayerAttack") &&
+      (type !== "LogPlayerAttack" || !isPlayerAirborne)
     ) {
       trajectory.push(location)
     }

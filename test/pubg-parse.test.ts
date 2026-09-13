@@ -843,6 +843,51 @@ describe("PUBG JSON:API parser", () => {
     )
 
     expect(analysis.flightPath).toEqual([{ x: 140, y: 240, z: 1000 }])
+    expect(analysis.trajectory).toEqual([
+      { x: 100, y: 200, z: 7000 },
+      { x: 120, y: 220, z: 5000 },
+    ])
+  })
+
+  it("keeps legitimate freefall positions while filtering airborne attacks", () => {
+    const analysis = parseTelemetry(
+      [
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 10,
+          character: {
+            accountId: "account.123",
+            location: { x: 100, y: 200, z: 90000 },
+          },
+        },
+        {
+          _T: "LogPlayerAttack",
+          elapsedTime: 15,
+          attacker: {
+            accountId: "account.123",
+            location: { x: 900, y: 1000, z: 90000 },
+          },
+        },
+        {
+          _T: "LogPlayerPosition",
+          elapsedTime: 20,
+          character: {
+            accountId: "account.123",
+            location: { x: 200, y: 300, z: 2000 },
+          },
+        },
+      ],
+      "account.123",
+      "match-freefall"
+    )
+
+    expect(analysis.trajectory).toEqual([
+      { x: 100, y: 200, z: 90000 },
+      { x: 200, y: 300, z: 2000 },
+    ])
+    expect(
+      analysis.replayFrames.flatMap((frame) => frame.players)
+    ).toContainEqual([0, 100, 200, "alive", 100])
   })
 
   it("stops the flight path when aircraft telemetry jumps after the drop", () => {
