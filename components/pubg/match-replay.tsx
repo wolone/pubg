@@ -435,7 +435,7 @@ function currentStates(frame: ReplayFrame | null) {
 
 type MapPan = { x: number; y: number }
 type ReplayLayer = "flightPath" | "trajectory" | "zones" | "events"
-type ReplayTimelineLayer = "events" | "zones"
+type ReplayTimelineLayer = "kills" | "attacks" | "zones"
 
 function MapEventMarker({ children }: { children: React.ReactNode }) {
   return <g>{children}</g>
@@ -1744,19 +1744,28 @@ function ReplayHud({
 function ReplayEventMarkers({
   events,
   duration,
+  visibleKinds,
   onSeek,
 }: {
   events: MatchAnalysis["timeline"]
   duration: number
+  visibleKinds: ReplayTimelineLayer[]
   onSeek: (seconds: number) => void
 }) {
   const markerLaneOffsets = [-6, 0, 6]
   const laneEndTimes = markerLaneOffsets.map(() => Number.NEGATIVE_INFINITY)
   const markers = events
     .flatMap((event) => {
+      const kind =
+        event.type.includes("Kill") || event.type.includes("Death")
+          ? "kills"
+          : event.type.includes("Attack")
+            ? "attacks"
+            : undefined
       if (
         event.elapsedSeconds === undefined ||
-        !/Kill|Death|Attack/.test(event.type)
+        kind === undefined ||
+        !visibleKinds.includes(kind)
       ) {
         return []
       }
@@ -1911,7 +1920,7 @@ export function MatchReplay({
   ])
   const [visibleTimelineLayers, setVisibleTimelineLayers] = React.useState<
     ReplayTimelineLayer[]
-  >(["events", "zones"])
+  >(["kills", "zones"])
   const [selectedPlayerId, setSelectedPlayerId] = React.useState(
     analysis.playerId
   )
@@ -2140,7 +2149,10 @@ export function MatchReplay({
                         size="sm"
                         aria-label="切换时间轴标记"
                       >
-                        <ToggleGroupItem value="events">事件</ToggleGroupItem>
+                        <ToggleGroupItem value="kills">
+                          击杀/淘汰
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="attacks">开火</ToggleGroupItem>
                         <ToggleGroupItem value="zones">
                           圈层阶段
                         </ToggleGroupItem>
@@ -2159,10 +2171,13 @@ export function MatchReplay({
                           )
                         }
                       />
-                      {visibleTimelineLayers.includes("events") ? (
+                      {visibleTimelineLayers.some(
+                        (layer) => layer === "kills" || layer === "attacks"
+                      ) ? (
                         <ReplayEventMarkers
                           events={analysis.timeline}
                           duration={duration}
+                          visibleKinds={visibleTimelineLayers}
                           onSeek={(seconds) => {
                             setPlaying(false)
                             setTime(seconds)
