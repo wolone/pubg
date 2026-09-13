@@ -324,9 +324,21 @@ function getBounds(analysis: MatchAnalysis, mapName: string) {
   const points = [
     ...analysis.trajectory,
     ...analysis.flightPath,
-    ...analysis.replayFrames.flatMap((frame) =>
-      frame.players.map(([, x, y]) => ({ x, y }))
-    ),
+    ...analysis.timeline.flatMap((event) => [
+      ...(event.location ? [event.location] : []),
+      ...(event.targetLocation ? [event.targetLocation] : []),
+    ]),
+    ...analysis.replayFrames.flatMap((frame) => [
+      ...frame.players.map(([, x, y]) => ({ x, y })),
+      ...Object.values(frame.zones ?? {}).flatMap((zone) =>
+        zone
+          ? [
+              { x: zone.x - zone.radius, y: zone.y - zone.radius },
+              { x: zone.x + zone.radius, y: zone.y + zone.radius },
+            ]
+          : []
+      ),
+    ]),
   ]
   if (points.length === 0) {
     return { minX: 0, minY: 0, width: 1000, height: 1000 }
