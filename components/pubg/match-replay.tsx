@@ -2027,7 +2027,10 @@ function ReplayEventMarkers({
               Math.abs(seconds - currentTime) <= 0.5 ? "time" : undefined
             }
             aria-label={`跳转到 ${formatTime(seconds)}：${event.message}`}
-            onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+            onPointerDown={(pointerEvent) => {
+              pointerEvent.preventDefault()
+              pointerEvent.stopPropagation()
+            }}
             onClick={(clickEvent) => {
               clickEvent.stopPropagation()
               onSeek(seconds)
@@ -2081,7 +2084,10 @@ function ReplayZoneMarkers({
             style={{ left: `${position}%` }}
             aria-current={index === activeMarkerIndex ? "time" : undefined}
             aria-label={`跳转到 ${formatTime(frame.elapsedSeconds)}：${phaseLabel}`}
-            onPointerDown={(pointerEvent) => pointerEvent.stopPropagation()}
+            onPointerDown={(pointerEvent) => {
+              pointerEvent.preventDefault()
+              pointerEvent.stopPropagation()
+            }}
             onClick={(clickEvent) => {
               clickEvent.stopPropagation()
               onSeek(frame.elapsedSeconds)
