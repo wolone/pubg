@@ -360,6 +360,9 @@ export function ReplayMap({
   const showEliminated = visibleLayers.includes("eliminated")
   const showStateMarkers = visibleTimelineLayers.includes("state")
   const visibleTime = currentFrame?.elapsedSeconds ?? currentTime
+  const firstReplayFrameTime = analysis.replayFrames[0]?.elapsedSeconds
+  const beforeReplayData =
+    firstReplayFrameTime !== undefined && currentTime < firstReplayFrameTime
 
   React.useEffect(() => {
     const element = viewportRef.current
@@ -1112,7 +1115,11 @@ export function ReplayMap({
               航线贯穿地图
             </Badge>
           ) : null}
-          {trackedPath ? (
+          {beforeReplayData ? (
+            <Badge variant="outline" className="bg-background/85">
+              位置数据从 T+{formatTime(firstReplayFrameTime!)} 开始
+            </Badge>
+          ) : trackedPath ? (
             <Badge variant="outline" className="bg-background/85">
               轨迹 {trackedPath.split(" ").length} 点
             </Badge>
